@@ -17,7 +17,7 @@ Citizens register civic complaints with photo evidence, descriptions, and geo-co
 - **Styling**: Tailwind CSS v4, Lucide React icons
 - **Geospatial & Mapping**: Leaflet.js, OpenStreetMap tiles, custom weighted density heatmap engine & coordinate picker
 - **Backend Framework**: Laravel 12 (PHP 8.2) REST API
-- **Database**: SQLite (portable development/testing), fully compatible with MySQL via Eloquent ORM migrations
+- **Database**: MySQL (Database: `fixmycity` on 127.0.0.1:3306) via Eloquent ORM migrations
 - **Authentication**: Laravel Sanctum token-based authentication with Role-Based Access Control (RBAC) middleware
 - **Architecture**: Decoupled Client-Server REST architecture with CORS enabled
 
