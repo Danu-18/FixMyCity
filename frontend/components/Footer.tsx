@@ -81,10 +81,7 @@ export function Footer() {
             <li>Danial Arif (Student ID: 202539)</li>
             <li>Karachi, Pakistan</li>
           </ul>
-          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-brand-violet">
-            <GraduationCap className="h-4 w-4 text-brand-violet" />
-            Civic AI Research Platform
-          </p>
+      
         </div>
       </div>
 
