@@ -39,3 +39,7 @@ Thumbs.db
 .fleet/
 .nova/
 .zed/
+
+# Reference prototype folder
+UI/
+

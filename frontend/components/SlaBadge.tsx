@@ -10,23 +10,27 @@ interface SlaBadgeProps {
 export function SlaBadge({ deadline, status, isBreached }: SlaBadgeProps) {
   if (status === 'Resolved') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-        <CheckCircle className="w-3.5 h-3.5" />
-        SLA Fulfilled
+      <span className="inline-flex items-center gap-1 rounded-full bg-brand-green/15 px-2 py-0.5 text-[10px] font-semibold text-brand-green">
+        <CheckCircle className="w-3 h-3" />
+        SLA Met
       </span>
     );
   }
 
   if (status === 'Rejected') {
     return (
-      <span className="text-xs text-zinc-500">
+      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
         Closed
       </span>
     );
   }
 
   if (!deadline) {
-    return null;
+    return (
+      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+        SLA Target 48h
+      </span>
+    );
   }
 
   const deadlineDate = new Date(deadline);
@@ -37,8 +41,8 @@ export function SlaBadge({ deadline, status, isBreached }: SlaBadgeProps) {
   if (isBreached || diffMs < 0) {
     const overdueHours = Math.abs(diffHours);
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/60 dark:text-red-400 dark:border-red-800">
-        <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+      <span className="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-bold text-destructive">
+        <AlertTriangle className="w-3 h-3 text-destructive" />
         Overdue by {overdueHours}h
       </span>
     );
@@ -46,17 +50,17 @@ export function SlaBadge({ deadline, status, isBreached }: SlaBadgeProps) {
 
   if (diffHours <= 12) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-400 dark:border-amber-800">
-        <Clock className="w-3.5 h-3.5 text-amber-600" />
+      <span className="inline-flex items-center gap-1 rounded-full bg-brand-amber/25 px-2 py-0.5 text-[10px] font-semibold text-brand-orange">
+        <Clock className="w-3 h-3" />
         {diffHours}h left (Urgent)
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800">
-      <Clock className="w-3.5 h-3.5 text-blue-500" />
-      {diffHours}h remaining
+    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+      <Clock className="w-3 h-3" />
+      {diffHours}h left
     </span>
   );
 }

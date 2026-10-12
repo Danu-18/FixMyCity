@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { apiGetDepartments } from '@/lib/api';
 import { Department } from '@/lib/types';
-import { AlertCircle, Building2, Loader2, Lock, Mail, Phone, Shield, User } from 'lucide-react';
+import { AlertCircle, Building2, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RegisterPage() {
@@ -64,20 +64,20 @@ export default function RegisterPage() {
   return (
     <div className="max-w-md mx-auto px-4 py-16 w-full flex-1 flex flex-col justify-center">
       <div className="text-center mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center mx-auto mb-3 shadow-md shadow-indigo-600/20">
-          <Shield className="w-6 h-6" />
+        <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md mx-auto mb-3">
+          <Building2 className="w-6 h-6" />
         </div>
-        <h1 className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-100">
+        <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
           Create FixMyCity Account
         </h1>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           Join your civic resolution network and start reporting community issues
         </p>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+      <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
         {errorMsg && (
-          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
+          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
@@ -86,17 +86,17 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Role Selector Tabs */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+            <label className="block text-xs font-bold text-foreground mb-1.5">
               Select Account Role
             </label>
-            <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg border border-border">
               <button
                 type="button"
                 onClick={() => setRole('citizen')}
-                className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
+                className={`py-1.5 text-xs font-semibold rounded-md transition-colors ${
                   role === 'citizen'
-                    ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-white shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400'
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Resident Citizen
@@ -104,10 +104,10 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setRole('authority')}
-                className={`py-2 text-xs font-semibold rounded-lg transition-colors ${
+                className={`py-1.5 text-xs font-semibold rounded-md transition-colors ${
                   role === 'authority'
-                    ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-white shadow-xs'
-                    : 'text-zinc-600 dark:text-zinc-400'
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Municipal Staff
@@ -116,51 +116,51 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-bold text-foreground mb-1">
               Full Name *
             </label>
             <div className="relative">
-              <User className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <User className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Danial Arif"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white"
+                placeholder="Name"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-bold text-foreground mb-1">
               Email Address *
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Mail className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="citizen@fixmycity.org"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white"
+                placeholder="Email"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-bold text-foreground mb-1">
               Contact Phone (Optional)
             </label>
             <div className="relative">
-              <Phone className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Phone className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+92 300 1234567"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
             </div>
           </div>
@@ -168,15 +168,15 @@ export default function RegisterPage() {
           {/* If Authority, Department Selector */}
           {role === 'authority' && (
             <div>
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+              <label className="block text-xs font-bold text-foreground mb-1">
                 Assigned Municipal Department *
               </label>
               <div className="relative">
-                <Building2 className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Building2 className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                 <select
                   value={departmentId}
                   onChange={(e) => setDepartmentId(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
                 >
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -189,11 +189,11 @@ export default function RegisterPage() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-xs font-bold text-foreground mb-1">
               Password (min 8 characters) *
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
@@ -201,7 +201,7 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
             </div>
           </div>
@@ -209,15 +209,15 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center justify-center gap-2"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Account & Continue'}
           </button>
         </form>
 
-        <p className="text-center text-xs text-zinc-500">
+        <p className="text-center text-xs text-muted-foreground">
           Already have an account?{' '}
-          <Link href="/login" className="text-indigo-600 font-semibold hover:underline">
+          <Link href="/login" className="text-primary font-semibold hover:underline">
             Sign In
           </Link>
         </p>

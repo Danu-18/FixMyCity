@@ -2,95 +2,98 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Shield, Mail, Phone, ExternalLink, Heart } from 'lucide-react';
+import { Building2, GraduationCap } from 'lucide-react';
 
 export function Footer() {
+  const departments = [
+    'Infrastructure & Road Maintenance (48h)',
+    'Water & Sanitation (36h)',
+    'Electricity & Power Utilities (24h)',
+    'Municipal Waste Management (24h)',
+    'Public Safety & Security (12h)',
+  ];
+
   return (
-    <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-          {/* Column 1: Brand & Overview */}
-          <div className="md:col-span-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
-                <Shield className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-lg text-zinc-900 dark:text-white">
-                FixMy<span className="text-indigo-600 dark:text-indigo-400">City</span>
-              </span>
-            </div>
-            <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              Smart Community Complaint and Civic Issue Resolution Platform. Connecting citizens directly with municipal departments through automated state-machine routing and SLA accountability.
-            </p>
+    <footer className="border-t border-border bg-card/50 px-4 pb-6 pt-12 text-foreground">
+      <div className="mx-auto grid max-w-6xl gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Column 1: Brand & Overview */}
+        <div>
+          <div className="flex items-center gap-2 font-bold text-foreground">
+            <span className="grid h-7 w-7 place-items-center rounded-md bg-primary text-primary-foreground shadow-xs">
+              <Building2 className="h-4 w-4" />
+            </span>
+            FixMyCity
           </div>
-
-          {/* Column 2: Quick Links */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-              Platform Features
-            </h4>
-            <ul className="space-y-2 text-xs">
-              <li>
-                <Link href="/explore" className="hover:text-indigo-600 transition-colors">
-                  City Issue Density Heatmap
-                </Link>
-              </li>
-              <li>
-                <Link href="/complaints" className="hover:text-indigo-600 transition-colors">
-                  Public Complaints Directory
-                </Link>
-              </li>
-              <li>
-                <Link href="/report" className="hover:text-indigo-600 transition-colors">
-                  Submit Geo-Tagged Issue
-                </Link>
-              </li>
-              <li>
-                <Link href="/track" className="hover:text-indigo-600 transition-colors">
-                  Track Resolution Timeline
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 3: Municipal Departments */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-              Integrated Departments
-            </h4>
-            <ul className="space-y-2 text-xs">
-              <li>Infrastructure & Road Maintenance (48h SLA)</li>
-              <li>Water & Sanitation (36h SLA)</li>
-              <li>Electricity & Power Utilities (24h SLA)</li>
-              <li>Municipal Waste Management (24h SLA)</li>
-              <li>Public Safety & Security (12h SLA)</li>
-            </ul>
-          </div>
-
-          {/* Column 4: Contact & Project Info */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-              Academic Project Info
-            </h4>
-            <div className="space-y-2 text-xs text-zinc-500">
-              <p>SWE6010 Undergraduate Project</p>
-              <p>Danial Arif (ID: 2533971)</p>
-              <p>Supervisor: Dr Nuwan</p>
-              <div className="flex items-center gap-1.5 pt-1">
-                <Mail className="w-3.5 h-3.5 text-indigo-500" />
-                <span>daniyalarif2004@gmail.com</span>
-              </div>
-            </div>
-          </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+            FixMyCity Community Documentation Board. Transparent, accountable civic reporting connecting citizens to municipal departments for faster resolutions.
+          </p>
         </div>
 
-        <div className="border-t border-zinc-200 dark:border-zinc-800/80 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
-          <p>© 2026 FixMyCity. Built for urban transparency & responsive governance.</p>
-          <div className="flex items-center gap-4">
-            <Link href="/explore" className="hover:underline">Heatmap</Link>
-            <Link href="/track" className="hover:underline">Quick Track</Link>
-            <Link href="/dashboard" className="hover:underline">Officer Portal</Link>
-          </div>
+        {/* Column 2: Platform Features */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+            Platform Features
+          </h4>
+          <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground">
+            <li>
+              <Link href="/explore" className="hover:text-primary transition-colors">
+                City Issue Density Heatmap
+              </Link>
+            </li>
+            <li>
+              <Link href="/complaints" className="hover:text-primary transition-colors">
+                Public Complaints Directory
+              </Link>
+            </li>
+            <li>
+              <Link href="/report" className="hover:text-primary transition-colors">
+                Submit Geo-Tagged Issue
+              </Link>
+            </li>
+            <li>
+              <Link href="/track" className="hover:text-primary transition-colors">
+                Public Tracking Status
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        {/* Column 3: Integrated Departments */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+            Integrated Departments
+          </h4>
+          <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground">
+            {departments.map((dept) => (
+              <li key={dept}>{dept}</li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Column 4: Academic Project Info */}
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
+            Academic Project Info
+          </h4>
+          <ul className="mt-3 space-y-1.5 text-[11px] text-muted-foreground">
+            <li>Final Year Project 2026</li>
+            <li>Department of Computer Science</li>
+            <li>Danial Arif (Student ID: 202539)</li>
+            <li>Karachi, Pakistan</li>
+          </ul>
+          <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-brand-violet">
+            <GraduationCap className="h-4 w-4 text-brand-violet" />
+            Civic AI Research Platform
+          </p>
+        </div>
+      </div>
+
+      <div className="mx-auto mt-10 flex max-w-6xl flex-col justify-between gap-2 border-t border-border/60 pt-4 text-[10px] text-muted-foreground sm:flex-row">
+        <span>© 2026 FixMyCity. Built for community complaints. All rights reserved.</span>
+        <div className="flex gap-6">
+          <Link href="/explore" className="hover:text-primary transition-colors">Heatmap</Link>
+          <Link href="/track" className="hover:text-primary transition-colors">Track Issue</Link>
+          <Link href="/dashboard" className="hover:text-primary transition-colors">Officer Portal</Link>
         </div>
       </div>
     </footer>

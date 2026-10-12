@@ -5,15 +5,11 @@ import dynamic from 'next/dynamic';
 import { apiGetCategories, apiGetDepartments, apiGetHeatmap } from '@/lib/api';
 import { Category, Department, HeatmapPoint } from '@/lib/types';
 import {
-  AlertTriangle,
   Building2,
-  Filter,
-  Layers,
   MapPin,
   RefreshCw,
-  Search,
-  SlidersHorizontal,
   X,
+  PlusCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -21,7 +17,7 @@ import Link from 'next/link';
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
   loading: () => (
-    <div className="h-[600px] w-full rounded-2xl bg-zinc-100 dark:bg-zinc-800 animate-pulse flex items-center justify-center text-zinc-400">
+    <div className="h-[600px] w-full rounded-xl bg-card border border-border animate-pulse flex items-center justify-center text-muted-foreground text-xs">
       Loading interactive map and geospatial heat engine...
     </div>
   ),
@@ -76,24 +72,22 @@ export default function ExploreMapPage() {
   }, [selectedDept, selectedCat, selectedStatus]);
 
   const urgentHotspots = points.filter((p) => p.priority === 'Urgent').length;
-  const pendingCount = points.filter((p) => p.status === 'Pending').length;
-  const inProgressCount = points.filter((p) => p.status === 'In Progress').length;
   const resolvedCount = points.filter((p) => p.status === 'Resolved').length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 flex flex-col">
+    <div className="max-w-6xl mx-auto px-4 py-8 w-full flex-1 flex flex-col">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
               Civic Issue Heatmap & Geospatial Directory
             </h1>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase">
               Live Density
             </span>
           </div>
-          <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+          <p className="mt-1 text-xs text-muted-foreground">
             Visualizing reported infrastructure failures, density concentrations, and departmental responsibilities across the urban landscape.
           </p>
         </div>
@@ -101,14 +95,15 @@ export default function ExploreMapPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/report"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-md shadow-xs transition-colors"
           >
+            <PlusCircle className="w-3.5 h-3.5" />
             Report In This Area
           </Link>
           <button
             onClick={fetchHeatmapData}
             disabled={isLoading}
-            className="p-2 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 transition-colors"
+            className="p-2 border border-input rounded-md hover:bg-accent text-muted-foreground transition-colors"
             title="Refresh map"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -117,11 +112,11 @@ export default function ExploreMapPage() {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-card border border-border rounded-xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 flex-1">
           {/* Department Filter */}
           <div className="min-w-[180px]">
-            <label className="block text-[11px] font-semibold text-zinc-500 mb-1 uppercase tracking-wider">
+            <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
               Department
             </label>
             <select
@@ -130,7 +125,7 @@ export default function ExploreMapPage() {
                 setSelectedDept(e.target.value);
                 setSelectedCat('');
               }}
-              className="w-full text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+              className="w-full text-xs bg-background border border-input rounded-lg px-2.5 py-1.5 text-foreground outline-none"
             >
               <option value="">All Departments</option>
               {departments.map((d) => (
@@ -143,13 +138,13 @@ export default function ExploreMapPage() {
 
           {/* Category Filter */}
           <div className="min-w-[180px]">
-            <label className="block text-[11px] font-semibold text-zinc-500 mb-1 uppercase tracking-wider">
+            <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
               Issue Category
             </label>
             <select
               value={selectedCat}
               onChange={(e) => setSelectedCat(e.target.value)}
-              className="w-full text-xs bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+              className="w-full text-xs bg-background border border-input rounded-lg px-2.5 py-1.5 text-foreground outline-none"
             >
               <option value="">All Categories</option>
               {categories
@@ -164,18 +159,18 @@ export default function ExploreMapPage() {
 
           {/* Status Tabs */}
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-500 mb-1 uppercase tracking-wider">
+            <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
               Status
             </label>
-            <div className="flex items-center rounded-lg border border-zinc-200 dark:border-zinc-700 p-0.5 bg-zinc-50 dark:bg-zinc-800 text-xs">
+            <div className="flex items-center rounded-lg border border-input p-0.5 bg-background text-xs">
               {['All', 'Pending', 'In Progress', 'Resolved'].map((st) => (
                 <button
                   key={st}
                   onClick={() => setSelectedStatus(st)}
-                  className={`px-3 py-1 rounded-md font-medium transition-colors ${
+                  className={`px-3 py-1 rounded-md font-semibold transition-colors ${
                     selectedStatus === st
-                      ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                      : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {st}
@@ -186,21 +181,21 @@ export default function ExploreMapPage() {
         </div>
 
         {/* Live Counters */}
-        <div className="flex items-center gap-4 text-xs text-zinc-500 border-t sm:border-t-0 pt-2 sm:pt-0 border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground border-t sm:border-t-0 pt-2 sm:pt-0 border-border">
           <div>
-            <span className="font-bold text-zinc-900 dark:text-white">{points.length}</span> Total Incidents
+            <span className="font-bold text-foreground">{points.length}</span> Total Incidents
           </div>
           <div>
-            <span className="font-bold text-red-600">{urgentHotspots}</span> Urgent
+            <span className="font-bold text-destructive">{urgentHotspots}</span> Urgent
           </div>
           <div>
-            <span className="font-bold text-emerald-600">{resolvedCount}</span> Resolved
+            <span className="font-bold text-brand-green">{resolvedCount}</span> Resolved
           </div>
         </div>
       </div>
 
       {/* Map Display & Selected Drawer */}
-      <div className="relative flex-1 min-h-[550px] flex flex-col">
+      <div className="relative flex-1 min-h-[550px] flex flex-col rounded-xl overflow-hidden border border-border">
         <LeafletMap
           mode="heatmap"
           points={points}
@@ -210,42 +205,43 @@ export default function ExploreMapPage() {
 
         {/* Selected Incident Drawer */}
         {selectedPoint && (
-          <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 p-5 z-20 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-96 bg-card rounded-xl shadow-2xl border border-border p-5 z-20 animate-in fade-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded">
+              <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
                 #{selectedPoint.tracking_number}
               </span>
               <button
                 onClick={() => setSelectedPoint(null)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100 mt-2">
-              {selectedPoint.title}
-            </h3>
+            <h3 className="font-bold text-foreground text-sm mt-2">{selectedPoint.title}</h3>
 
-            <div className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 space-y-1">
-              <p>🏛️ <b>Dept:</b> {selectedPoint.department}</p>
-              <p>🏷️ <b>Category:</b> {selectedPoint.category}</p>
-              {selectedPoint.address && <p>📍 <b>Address:</b> {selectedPoint.address}</p>}
-              <p>
-                Status: <span className="font-semibold text-indigo-600">{selectedPoint.status}</span> &bull; Upvotes:{' '}
-                <b>{selectedPoint.upvotes_count || 0}</b>
-              </p>
+            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>{selectedPoint.department}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>
+                  {selectedPoint.lat.toFixed(4)}, {selectedPoint.lng.toFixed(4)}
+                </span>
+              </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-3">
-              <span className="text-[11px] text-zinc-400">
-                {new Date(selectedPoint.created_at).toLocaleDateString()}
+            <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-muted-foreground">
+                Priority: <b className="text-foreground">{selectedPoint.priority}</b>
               </span>
               <Link
                 href={`/complaints/${selectedPoint.id}`}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="text-xs font-semibold text-primary hover:underline"
               >
-                View Full Tracking Details →
+                View Full Details →
               </Link>
             </div>
           </div>

@@ -16,12 +16,10 @@ import {
   Calendar,
   CheckCircle,
   Clock,
-  ExternalLink,
   History,
   Image as ImageIcon,
   Loader2,
   MapPin,
-  Share2,
   ThumbsUp,
   User,
   Wrench,
@@ -31,7 +29,7 @@ import Link from 'next/link';
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
   loading: () => (
-    <div className="h-64 w-full rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse flex items-center justify-center text-zinc-400 text-xs">
+    <div className="h-64 w-full rounded-xl bg-card border border-border animate-pulse flex items-center justify-center text-muted-foreground text-xs">
       Loading map preview...
     </div>
   ),
@@ -68,10 +66,11 @@ function ComplaintDetailContent() {
       setComplaint(data);
       setUpvotes(data.upvotes_count || 0);
       setHasUpvoted(data.has_upvoted || false);
-      setNewStatus(data.status === 'Pending' ? 'In Progress' : 'Resolved');
+      if (data.status === 'Pending') setNewStatus('In Progress');
+      else if (data.status === 'In Progress') setNewStatus('Resolved');
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || 'Complaint not found.');
+      setErrorMsg(err.message || 'Failed to retrieve complaint.');
     } finally {
       setIsLoading(false);
     }
@@ -84,14 +83,13 @@ function ComplaintDetailContent() {
   }, [idOrTracking]);
 
   const handleUpvote = async () => {
-    if (!complaint) return;
     if (!user) {
-      router.push('/login');
+      window.location.href = '/login';
       return;
     }
-    if (isVoting) return;
-    setIsVoting(true);
+    if (!complaint || isVoting) return;
 
+    setIsVoting(true);
     try {
       const res = await apiToggleUpvote(complaint.id);
       setUpvotes(res.upvotes_count);
@@ -114,8 +112,8 @@ function ComplaintDetailContent() {
     try {
       const formData = new FormData();
       formData.append('status', newStatus);
-      if (resolutionNotes) {
-        formData.append('notes', resolutionNotes);
+      if (resolutionNotes.trim()) {
+        formData.append('notes', resolutionNotes.trim());
       }
       if (resolutionImage) {
         formData.append('resolution_image', resolutionImage);
@@ -143,8 +141,8 @@ function ComplaintDetailContent() {
   if (isLoading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-20 text-center">
-        <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600 mb-3" />
-        <p className="text-xs text-zinc-500">Retrieving complaint history and SLA logs...</p>
+        <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-3" />
+        <p className="text-xs text-muted-foreground">Retrieving complaint history and SLA logs...</p>
       </div>
     );
   }
@@ -152,16 +150,16 @@ function ComplaintDetailContent() {
   if (errorMsg || !complaint) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center">
-        <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
+        <div className="w-12 h-12 rounded-full bg-destructive/15 text-destructive flex items-center justify-center mx-auto mb-4">
           <AlertTriangle className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Complaint Not Found</h2>
-        <p className="text-xs text-zinc-500 mt-1">
+        <h2 className="text-lg font-bold text-foreground">Complaint Not Found</h2>
+        <p className="text-xs text-muted-foreground mt-1">
           {errorMsg || 'No record matched this tracking identifier.'}
         </p>
         <Link
           href="/complaints"
-          className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 hover:underline"
+          className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-primary hover:underline"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Complaints Directory
@@ -176,14 +174,14 @@ function ComplaintDetailContent() {
       <div className="mb-6 flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950 px-2.5 py-1 rounded-lg">
+          <span className="font-mono text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
             #{complaint.tracking_number}
           </span>
         </div>
@@ -193,7 +191,7 @@ function ComplaintDetailContent() {
         {/* Main Left Column: Overview, Progress Stepper, Description, Evidence, Audit Trail */}
         <div className="lg:col-span-2 space-y-6">
           {/* Header Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex items-center gap-2">
                 <PriorityBadge priority={complaint.priority} />
@@ -206,11 +204,11 @@ function ComplaintDetailContent() {
               />
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-100 leading-snug">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-snug">
               {complaint.title}
             </h1>
 
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-zinc-500">
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
                 Reported {new Date(complaint.created_at).toLocaleString()}
@@ -224,14 +222,14 @@ function ComplaintDetailContent() {
             </div>
 
             {/* Visual Workflow Stepper */}
-            <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">
+            <div className="mt-8 pt-6 border-t border-border">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4">
                 Resolution Workflow State
               </h3>
 
               <div className="relative flex items-center justify-between">
                 {/* Stepper Line */}
-                <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1 bg-zinc-200 dark:bg-zinc-800 -z-0" />
+                <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-1 bg-border -z-0" />
 
                 {/* Step 1: Pending */}
                 <div className="relative z-10 flex flex-col items-center">
@@ -240,16 +238,16 @@ function ComplaintDetailContent() {
                       complaint.status === 'Pending' ||
                       complaint.status === 'In Progress' ||
                       complaint.status === 'Resolved'
-                        ? 'bg-amber-500 text-white shadow-md'
-                        : 'bg-zinc-200 text-zinc-600'
+                        ? 'bg-brand-orange text-white shadow-md'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     1
                   </div>
-                  <span className="mt-2 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  <span className="mt-2 text-[11px] font-semibold text-foreground">
                     Pending
                   </span>
-                  <span className="text-[10px] text-zinc-400">Auto-Routed</span>
+                  <span className="text-[10px] text-muted-foreground">Auto-Routed</span>
                 </div>
 
                 {/* Step 2: In Progress */}
@@ -257,16 +255,16 @@ function ComplaintDetailContent() {
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${
                       complaint.status === 'In Progress' || complaint.status === 'Resolved'
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     2
                   </div>
-                  <span className="mt-2 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  <span className="mt-2 text-[11px] font-semibold text-foreground">
                     In Progress
                   </span>
-                  <span className="text-[10px] text-zinc-400">Crew Dispatched</span>
+                  <span className="text-[10px] text-muted-foreground">Crew Dispatched</span>
                 </div>
 
                 {/* Step 3: Resolved */}
@@ -274,38 +272,38 @@ function ComplaintDetailContent() {
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${
                       complaint.status === 'Resolved'
-                        ? 'bg-emerald-600 text-white shadow-md'
-                        : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500'
+                        ? 'bg-brand-green text-white shadow-md'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     3
                   </div>
-                  <span className="mt-2 text-[11px] font-semibold text-zinc-700 dark:text-zinc-300">
+                  <span className="mt-2 text-[11px] font-semibold text-foreground">
                     Resolved
                   </span>
-                  <span className="text-[10px] text-zinc-400">Inspected & Closed</span>
+                  <span className="text-[10px] text-muted-foreground">Inspected & Closed</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Description & Photo Evidence */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-4">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Problem Description & Evidence
             </h2>
 
-            <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed whitespace-pre-wrap">
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
               {complaint.description}
             </p>
 
             {complaint.image_url && (
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                <h3 className="text-xs font-semibold text-zinc-500 mb-2 flex items-center gap-1.5">
-                  <ImageIcon className="w-4 h-4 text-indigo-600" />
+              <div className="pt-4 border-t border-border">
+                <h3 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4 text-primary" />
                   Citizen Uploaded Photo Evidence:
                 </h3>
-                <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700 max-h-96 bg-zinc-100 dark:bg-zinc-800">
+                <div className="rounded-xl overflow-hidden border border-border max-h-96 bg-muted">
                   <img
                     src={complaint.image_url}
                     alt={complaint.title}
@@ -318,33 +316,33 @@ function ComplaintDetailContent() {
 
           {/* Resolution Outcome (if resolved) */}
           {complaint.status === 'Resolved' && (
-            <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-6 shadow-xs">
-              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-2">
-                <CheckCircle className="w-5 h-5 text-emerald-600" />
+            <div className="bg-brand-green/10 border border-brand-green/20 rounded-xl p-6 shadow-xs">
+              <div className="flex items-center gap-2 text-brand-green font-bold text-sm mb-2">
+                <CheckCircle className="w-5 h-5 text-brand-green" />
                 Resolution Outcome
               </div>
 
               {complaint.resolution_notes && (
-                <p className="text-xs text-emerald-900 dark:text-emerald-200 leading-relaxed">
+                <p className="text-xs text-foreground leading-relaxed">
                   {complaint.resolution_notes}
                 </p>
               )}
 
               {complaint.resolved_at && (
-                <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-2">
+                <p className="text-[11px] text-muted-foreground mt-2">
                   Completed on: {new Date(complaint.resolved_at).toLocaleString()}
                 </p>
               )}
 
               {complaint.resolution_image_url && (
                 <div className="mt-4">
-                  <p className="text-[11px] font-semibold text-emerald-800 mb-1">
+                  <p className="text-[11px] font-semibold text-foreground mb-1">
                     Completion Verification Photo:
                   </p>
                   <img
                     src={complaint.resolution_image_url}
                     alt="Resolution evidence"
-                    className="rounded-lg max-h-48 object-cover border border-emerald-300"
+                    className="rounded-lg max-h-48 object-cover border border-border"
                   />
                 </div>
               )}
@@ -352,45 +350,45 @@ function ComplaintDetailContent() {
           )}
 
           {/* Complete Status History / Audit Trail Timeline */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-400 mb-4 flex items-center gap-2">
-              <History className="w-4 h-4 text-indigo-600" />
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+              <History className="w-4 h-4 text-primary" />
               <span>Status Transition Audit Trail</span>
             </h2>
 
             {!complaint.status_history || complaint.status_history.length === 0 ? (
-              <p className="text-xs text-zinc-400">No status changes recorded yet.</p>
+              <p className="text-xs text-muted-foreground">No status changes recorded yet.</p>
             ) : (
-              <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-200 dark:before:bg-zinc-800">
+              <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-border">
                 {complaint.status_history.map((hist, idx) => (
                   <div key={hist.id || idx} className="relative">
-                    <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center ring-4 ring-white dark:ring-zinc-900">
-                      <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                    <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center ring-4 ring-card">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                     </div>
 
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                        <span className="text-xs font-bold text-foreground">
                           {hist.new_status}
                         </span>
                         {hist.old_status && (
-                          <span className="text-[11px] text-zinc-400">
+                          <span className="text-[11px] text-muted-foreground">
                             (was {hist.old_status})
                           </span>
                         )}
-                        <span className="text-[11px] text-zinc-400">
+                        <span className="text-[11px] text-muted-foreground">
                           &bull; {new Date(hist.changed_at).toLocaleString()}
                         </span>
                       </div>
 
                       {hist.notes && (
-                        <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                           {hist.notes}
                         </p>
                       )}
 
                       {hist.changer && (
-                        <p className="mt-1 text-[11px] text-zinc-400">
+                        <p className="mt-1 text-[11px] text-muted-foreground">
                           Logged by: <b>{hist.changer.name}</b> ({hist.changer.role})
                         </p>
                       )}
@@ -405,22 +403,22 @@ function ComplaintDetailContent() {
         {/* Right Column: Routing & Department metadata, Leaflet map, Upvote, Officer Action box */}
         <div className="space-y-6">
           {/* Community Upvote Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs text-center">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-2">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs text-center">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               Community Prioritization
             </h3>
-            <p className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-100">
+            <p className="text-3xl font-extrabold text-foreground">
               {upvotes}
             </p>
-            <p className="text-xs text-zinc-500 mb-4">Citizens confirmed this issue</p>
+            <p className="text-xs text-muted-foreground mb-4">Citizens confirmed this issue</p>
 
             <button
               onClick={handleUpvote}
               disabled={isVoting}
-              className={`w-full py-3 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              className={`w-full py-2.5 px-4 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                 hasUpvoted
-                  ? 'bg-indigo-600 text-white shadow-md hover:bg-indigo-700'
-                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200'
+                  ? 'bg-primary text-primary-foreground shadow-md hover:bg-primary/90'
+                  : 'bg-muted text-foreground hover:bg-accent'
               }`}
             >
               <ThumbsUp className={`w-4 h-4 ${hasUpvoted ? 'fill-current' : ''}`} />
@@ -429,37 +427,37 @@ function ComplaintDetailContent() {
           </div>
 
           {/* Department & SLA Information */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Routing Assignment
             </h3>
 
             <div>
-              <p className="text-[11px] text-zinc-500">Responsible Department</p>
-              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+              <p className="text-[11px] text-muted-foreground">Responsible Department</p>
+              <p className="text-xs font-bold text-foreground mt-0.5 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-primary shrink-0" />
                 {complaint.department?.department_name}
               </p>
             </div>
 
             <div>
-              <p className="text-[11px] text-zinc-500">Department Contact Email</p>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-0.5 font-mono">
+              <p className="text-[11px] text-muted-foreground">Department Contact Email</p>
+              <p className="text-xs text-foreground mt-0.5 font-mono">
                 {complaint.department?.contact_email}
               </p>
             </div>
 
             <div>
-              <p className="text-[11px] text-zinc-500">Issue Category</p>
-              <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 mt-0.5">
+              <p className="text-[11px] text-muted-foreground">Issue Category</p>
+              <p className="text-xs font-semibold text-foreground mt-0.5">
                 {complaint.category?.category_name}
               </p>
             </div>
 
-            <div className="pt-3 border-t border-zinc-100 dark:border-zinc-800">
-              <p className="text-[11px] text-zinc-500">Target SLA Resolution Deadline</p>
-              <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+            <div className="pt-3 border-t border-border">
+              <p className="text-[11px] text-muted-foreground">Target SLA Resolution Deadline</p>
+              <p className="text-xs font-bold text-foreground mt-0.5 flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-brand-orange shrink-0" />
                 {complaint.sla_deadline
                   ? new Date(complaint.sla_deadline).toLocaleString()
                   : 'N/A'}
@@ -468,19 +466,19 @@ function ComplaintDetailContent() {
           </div>
 
           {/* Location Map Preview */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-xs space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Location Preview
             </h3>
 
             {complaint.address && (
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 flex items-start gap-1.5">
-                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-foreground flex items-start gap-1.5">
+                <MapPin className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
                 <span>{complaint.address}</span>
               </p>
             )}
 
-            <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700">
+            <div className="rounded-lg overflow-hidden border border-border">
               <LeafletMap
                 mode="preview"
                 selectedLocation={{ lat: complaint.latitude, lng: complaint.longitude }}
@@ -493,36 +491,36 @@ function ComplaintDetailContent() {
 
           {/* Authority Officer Status Update Box (Authorized for Authority & Admin) */}
           {canUpdateStatus && (
-            <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-zinc-900 dark:to-indigo-950/30 border-2 border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 shadow-md space-y-4">
-              <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 font-bold text-sm">
-                <Wrench className="w-4 h-4 text-indigo-600" />
+            <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-6 shadow-md space-y-4">
+              <div className="flex items-center gap-2 text-primary font-bold text-sm">
+                <Wrench className="w-4 h-4" />
                 Department Officer Action Box
               </div>
-              <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+              <p className="text-[11px] text-muted-foreground">
                 You are authenticated as <b>{user?.name}</b> with authority over this department.
               </p>
 
               {statusSuccessMsg && (
-                <div className="p-3 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-medium">
+                <div className="p-3 bg-brand-green/20 text-brand-green rounded-lg text-xs font-semibold">
                   {statusSuccessMsg}
                 </div>
               )}
 
               {statusErrorMsg && (
-                <div className="p-3 bg-red-100 text-red-800 rounded-xl text-xs font-medium">
+                <div className="p-3 bg-destructive/15 text-destructive rounded-lg text-xs font-semibold">
                   {statusErrorMsg}
                 </div>
               )}
 
               <form onSubmit={handleStatusSubmit} className="space-y-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-semibold text-foreground mb-1">
                     Transition Status
                   </label>
                   <select
                     value={newStatus}
                     onChange={(e) => setNewStatus(e.target.value)}
-                    className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg p-2"
+                    className="w-full text-xs bg-background border border-input rounded-md p-2 text-foreground outline-none"
                   >
                     <option value="Pending">Pending (Triage)</option>
                     <option value="In Progress">In Progress (Crew Assigned)</option>
@@ -532,7 +530,7 @@ function ComplaintDetailContent() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-semibold text-foreground mb-1">
                     Resolution / Inspection Notes
                   </label>
                   <textarea
@@ -540,12 +538,12 @@ function ComplaintDetailContent() {
                     value={resolutionNotes}
                     onChange={(e) => setResolutionNotes(e.target.value)}
                     placeholder="Enter crew details, work orders, actions taken..."
-                    className="w-full text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-lg p-2"
+                    className="w-full text-xs bg-background border border-input rounded-md p-2 text-foreground outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  <label className="block text-[11px] font-semibold text-foreground mb-1">
                     Completion Proof Photo (Optional)
                   </label>
                   <input
@@ -556,14 +554,14 @@ function ComplaintDetailContent() {
                         setResolutionImage(e.target.files[0]);
                       }
                     }}
-                    className="w-full text-xs text-zinc-500"
+                    className="w-full text-xs text-muted-foreground"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={isUpdatingStatus}
-                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center justify-center gap-2"
                 >
                   {isUpdatingStatus ? (
                     <>
@@ -585,7 +583,13 @@ function ComplaintDetailContent() {
 
 export default function ComplaintDetailPage() {
   return (
-    <Suspense fallback={<div className="max-w-5xl mx-auto px-4 py-20 text-center text-xs text-zinc-400">Loading complaint details...</div>}>
+    <Suspense
+      fallback={
+        <div className="max-w-5xl mx-auto px-4 py-20 text-center text-xs text-muted-foreground">
+          Loading complaint details...
+        </div>
+      }
+    >
       <ComplaintDetailContent />
     </Suspense>
   );

@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Shield, ArrowRight, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Building2, ArrowRight } from 'lucide-react';
 
 export default function TrackPage() {
   const router = useRouter();
@@ -27,23 +26,23 @@ export default function TrackPage() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-16 flex-1 flex flex-col justify-center">
+    <div className="max-w-2xl mx-auto px-4 py-16 flex-1 flex flex-col justify-center w-full">
       <div className="text-center mb-8">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto mb-4">
-          <Shield className="w-7 h-7" />
+        <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground shadow-md mx-auto mb-4">
+          <Building2 className="w-6 h-6" />
         </div>
-        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
+        <h1 className="text-3xl font-extrabold text-foreground tracking-tight">
           Track Your Civic Complaint
         </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
           Enter your unique tracking number to see real-time state machine progress, assigned municipal department, and SLA resolution deadline.
         </p>
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 shadow-sm">
+      <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm">
         <form onSubmit={handleTrack} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-foreground mb-2 uppercase tracking-wider">
               Tracking Number
             </label>
             <div className="relative">
@@ -55,23 +54,23 @@ export default function TrackPage() {
                   setError('');
                 }}
                 placeholder="e.g. FMC-2026-1001"
-                className="w-full pl-4 pr-32 py-3.5 text-base font-mono bg-zinc-50 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-indigo-500 text-zinc-900 dark:text-white uppercase"
+                className="w-full pl-4 pr-32 py-3 text-sm font-mono bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground placeholder:text-muted-foreground uppercase outline-none"
               />
               <button
                 type="submit"
-                className="absolute right-2 top-2 bottom-2 px-5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5"
+                className="absolute right-1.5 top-1.5 bottom-1.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-md transition-colors flex items-center gap-1.5"
               >
                 Track Now
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            {error && <p className="mt-2 text-xs text-red-600 font-medium">{error}</p>}
+            {error && <p className="mt-2 text-xs text-destructive font-medium">{error}</p>}
           </div>
         </form>
 
         {/* Quick Sample Identifiers */}
-        <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800">
-          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
+        <div className="mt-8 pt-6 border-t border-border">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
             Quick Test Identifiers:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -80,16 +79,16 @@ export default function TrackPage() {
                 key={item.id}
                 type="button"
                 onClick={() => router.push(`/complaints/${item.id}`)}
-                className="p-3 text-left rounded-xl border border-zinc-200 dark:border-zinc-700 hover:border-indigo-400 bg-zinc-50 dark:bg-zinc-800/60 transition-colors flex items-center justify-between"
+                className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-background hover:bg-accent text-left transition-colors group"
               >
                 <div>
-                  <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                  <p className="font-mono text-xs font-bold text-foreground group-hover:text-primary transition-colors">
                     {item.id}
-                  </span>
-                  <p className="text-[11px] text-zinc-500 mt-0.5">{item.category}</p>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">{item.category}</p>
                 </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300">
-                  {item.status}
+                <span className="text-[10px] font-semibold text-primary">
+                  View →
                 </span>
               </button>
             ))}
