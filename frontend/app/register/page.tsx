@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { apiGetDepartments } from '@/lib/api';
 import { Department } from '@/lib/types';
-import { AlertCircle, Building2, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
+import { Building2, Loader2, Lock, Mail, Phone, User } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -21,7 +22,6 @@ export default function RegisterPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadDepts() {
@@ -40,7 +40,6 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
     setIsLoading(true);
 
     try {
@@ -52,10 +51,11 @@ export default function RegisterPage() {
         role,
         department_id: role === 'authority' ? Number(departmentId) : undefined,
       });
+      toast.success('Account created successfully! Welcome to FixMyCity.');
       router.push('/dashboard');
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Registration failed. Please check the provided info.');
+      const msg = err.message || 'Registration failed. Please check the provided info.';
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -76,13 +76,6 @@ export default function RegisterPage() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
-        {errorMsg && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Role Selector Tabs */}
           <div>

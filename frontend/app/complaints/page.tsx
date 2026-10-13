@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 function ComplaintsContent() {
   const searchParams = useSearchParams();
@@ -47,8 +48,8 @@ function ComplaintsContent() {
         per_page: 9,
       });
       setComplaintsData(res);
-    } catch (err) {
-      console.error('Error fetching complaints', err);
+    } catch {
+      toast.error('Unable to fetch complaints list.');
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +64,8 @@ function ComplaintsContent() {
         ]);
         setDepartments(depts || []);
         setCategories(cats || []);
-      } catch (err) {
-        console.error(err);
+      } catch {
+        // Fallback for metadata
       }
     }
     loadMetadata();
@@ -88,6 +89,7 @@ function ComplaintsContent() {
     setSlaStatus('');
     setSort('newest');
     setPage(1);
+    toast.info('Search filters reset to default.');
   };
 
   return (

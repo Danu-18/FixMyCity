@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { apiGetMe, apiGetNotifications, apiLogin, apiLogout, apiRegister } from '@/lib/api';
 import { User } from '@/lib/types';
+import { toast } from 'react-toastify';
 
 interface AuthContextType {
   user: User | null;
@@ -88,6 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setToken(null);
     setUnreadCount(0);
+    toast.info('Signed out successfully.');
   };
 
   return (

@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { AlertCircle, Building2, Loader2, Lock, Mail } from 'lucide-react';
+import { Building2, Loader2, Lock, Mail } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,27 +14,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
     setIsLoading(true);
 
     try {
       await login(email.trim(), password);
+      toast.success('Signed in successfully! Welcome back.');
       router.push('/dashboard');
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Invalid email or password.');
+      const msg = err.message || 'Invalid email or password.';
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickLogin = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('password123');
   };
 
   return (
@@ -51,13 +46,6 @@ export default function LoginPage() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
-        {errorMsg && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-foreground mb-1">

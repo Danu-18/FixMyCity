@@ -12,6 +12,7 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 // Dynamically import LeafletMap with ssr: false
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
@@ -44,8 +45,8 @@ export default function ExploreMapPage() {
         status: selectedStatus !== 'All' ? selectedStatus : undefined,
       });
       setPoints(res.points || []);
-    } catch (err) {
-      console.error('Error fetching heatmap', err);
+    } catch {
+      toast.error('Unable to refresh geospatial heatmap data.');
     } finally {
       setIsLoading(false);
     }
@@ -60,8 +61,8 @@ export default function ExploreMapPage() {
         ]);
         setDepartments(depts || []);
         setCategories(cats || []);
-      } catch (e) {
-        console.error(e);
+      } catch {
+        // Fallback for metadata
       }
     }
     loadFilters();

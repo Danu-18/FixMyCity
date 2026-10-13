@@ -25,6 +25,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
@@ -69,7 +70,6 @@ function ComplaintDetailContent() {
       if (data.status === 'Pending') setNewStatus('In Progress');
       else if (data.status === 'In Progress') setNewStatus('Resolved');
     } catch (err: any) {
-      console.error(err);
       setErrorMsg(err.message || 'Failed to retrieve complaint.');
     } finally {
       setIsLoading(false);
@@ -84,7 +84,8 @@ function ComplaintDetailContent() {
 
   const handleUpvote = async () => {
     if (!user) {
-      window.location.href = '/login';
+      toast.info('Please sign in to upvote this issue.');
+      router.push('/login');
       return;
     }
     if (!complaint || isVoting) return;
@@ -94,8 +95,13 @@ function ComplaintDetailContent() {
       const res = await apiToggleUpvote(complaint.id);
       setUpvotes(res.upvotes_count);
       setHasUpvoted(res.has_upvoted);
-    } catch (err) {
-      console.error(err);
+      if (res.has_upvoted) {
+        toast.success('Upvoted! Thank you for supporting this issue.');
+      } else {
+        toast.info('Upvote removed.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update upvote.');
     } finally {
       setIsVoting(false);
     }
@@ -121,12 +127,15 @@ function ComplaintDetailContent() {
 
       const res = await apiUpdateComplaintStatus(complaint.id, formData);
       setComplaint(res.complaint);
-      setStatusSuccessMsg(`Complaint status successfully transitioned to '${newStatus}'.`);
+      const msg = `Complaint status successfully transitioned to '${newStatus}'.`;
+      setStatusSuccessMsg(msg);
+      toast.success(msg);
       setResolutionNotes('');
       setResolutionImage(null);
     } catch (err: any) {
-      console.error(err);
-      setStatusErrorMsg(err.message || 'Failed to update status.');
+      const msg = err.message || 'Failed to update status.';
+      setStatusErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsUpdatingStatus(false);
     }

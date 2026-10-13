@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -72,8 +73,8 @@ export default function DashboardPage() {
           setComplaints(allComplaints.data || []);
         }
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
+      // Dashboard fetch fallback
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +103,9 @@ export default function DashboardPage() {
         status: transitionStatus,
         notes: transitionNotes,
       });
-      setActionSuccess(`Complaint #${selectedComplaint.tracking_number} moved to '${transitionStatus}'.`);
+      const msg = `Complaint #${selectedComplaint.tracking_number} moved to '${transitionStatus}'.`;
+      setActionSuccess(msg);
+      toast.success(msg);
       setTransitionNotes('');
       loadDashboardData();
       setTimeout(() => {
@@ -110,7 +113,9 @@ export default function DashboardPage() {
         setActionSuccess(null);
       }, 1500);
     } catch (err: any) {
-      setActionError(err.message || 'Status transition failed.');
+      const msg = err.message || 'Status transition failed.';
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmittingTransition(false);
     }
@@ -121,12 +126,14 @@ export default function DashboardPage() {
     setSlaAuditMessage(null);
     try {
       const res = await apiTriggerSlaCheck();
-      setSlaAuditMessage(
-        `SLA Audit Complete: ${res.results.breached} breached, ${res.results.nearing_breach} nearing deadline.`
-      );
+      const msg = `SLA Audit Complete: ${res.results.breached} breached, ${res.results.nearing_breach} nearing deadline.`;
+      setSlaAuditMessage(msg);
+      toast.success(msg);
       loadDashboardData();
     } catch (err: any) {
-      setSlaAuditMessage('SLA audit failed: ' + (err.message || 'Error'));
+      const msg = 'SLA audit failed: ' + (err.message || 'Error');
+      setSlaAuditMessage(msg);
+      toast.error(msg);
     } finally {
       setIsTriggeringSla(false);
     }

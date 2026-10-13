@@ -78,6 +78,15 @@
   --gradient-text: linear-gradient(90deg, var(--primary), var(--brand-violet), var(--brand-pink), var(--primary));
   --gradient-reports: linear-gradient(180deg, oklch(0.97 0.025 80), oklch(0.98 0.015 60));
   --gradient-authorities: linear-gradient(180deg, oklch(0.97 0.02 240), oklch(0.99 0.005 240));
+
+  /* React-Toastify design system integration */
+  --toastify-color-light: #ffffff;
+  --toastify-text-color-light: #0f172a;
+  --toastify-color-info: oklch(0.58 0.12 190);
+  --toastify-color-success: oklch(0.68 0.17 150);
+  --toastify-color-warning: oklch(0.72 0.17 55);
+  --toastify-color-error: oklch(0.577 0.245 27.325);
+  --toastify-toast-bd-radius: 0.75rem;
 }
 
 .dark,
@@ -113,6 +122,14 @@
   --gradient-hero: radial-gradient(ellipse at 15% 20%, oklch(0.22 0.05 190) 0%, transparent 50%), linear-gradient(180deg, oklch(0.15 0.03 230), oklch(0.12 0.03 264));
   --gradient-reports: linear-gradient(180deg, oklch(0.15 0.02 240), oklch(0.13 0.02 260));
   --gradient-authorities: linear-gradient(180deg, oklch(0.16 0.02 240), oklch(0.14 0.02 250));
+
+  /* React-Toastify dark mode integration */
+  --toastify-color-dark: oklch(0.18 0.035 264.695);
+  --toastify-text-color-dark: oklch(0.984 0.003 247.858);
+  --toastify-color-info: oklch(0.65 0.13 190);
+  --toastify-color-success: oklch(0.72 0.17 150);
+  --toastify-color-warning: oklch(0.75 0.17 55);
+  --toastify-color-error: oklch(0.704 0.191 22.216);
 }
 
 @utility bg-hero { background: var(--gradient-hero); }

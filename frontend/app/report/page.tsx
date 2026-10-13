@@ -7,7 +7,6 @@ import { apiGetCategories, apiSubmitComplaint } from '@/lib/api';
 import { Category, Complaint } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import {
-  AlertCircle,
   Building2,
   Camera,
   CheckCircle2,
@@ -16,6 +15,7 @@ import {
   Send,
 } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
@@ -45,7 +45,6 @@ export default function ReportComplaintPage() {
 
   // Submission Status
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [createdComplaint, setCreatedComplaint] = useState<Complaint | null>(null);
 
   useEffect(() => {
@@ -57,8 +56,8 @@ export default function ReportComplaintPage() {
           setCategoryId(String(cats[0].id));
           setPriority(cats[0].default_priority || 'Medium');
         }
-      } catch (err) {
-        console.error('Failed to load categories', err);
+      } catch {
+        // Categories load fallback
       } finally {
         setIsLoadingCats(false);
       }
@@ -83,18 +82,17 @@ export default function ReportComplaintPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
 
     if (!title.trim()) {
-      setErrorMsg('Please provide a title for the civic problem.');
+      toast.warn('Please provide a title for the civic problem.');
       return;
     }
     if (!description.trim()) {
-      setErrorMsg('Please provide a detailed description of the issue.');
+      toast.warn('Please provide a detailed description of the issue.');
       return;
     }
     if (!categoryId) {
-      setErrorMsg('Please select a complaint category.');
+      toast.warn('Please select a complaint category.');
       return;
     }
 
@@ -117,9 +115,10 @@ export default function ReportComplaintPage() {
 
       const res = await apiSubmitComplaint(formData);
       setCreatedComplaint(res.complaint);
+      toast.success(`Complaint registered! Tracking ID: ${res.complaint.tracking_number}`);
     } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || 'Failed to submit complaint. Please try again.');
+      const msg = err.message || 'Failed to submit complaint. Please try again.';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -215,13 +214,6 @@ export default function ReportComplaintPage() {
           Submit details, photo evidence, and geo-coordinates. The system will automatically route your complaint to the responsible municipal department.
         </p>
       </div>
-
-      {errorMsg && (
-        <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center gap-3 text-destructive text-xs">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Step 1: Category & Routing Preview */}

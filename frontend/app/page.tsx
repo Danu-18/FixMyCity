@@ -27,6 +27,7 @@ import {
   Landmark,
   ArrowRight,
 } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 export default function HomePage() {
   const router = useRouter();
@@ -47,8 +48,8 @@ export default function HomePage() {
         setRecentComplaints(complaintsRes.data || []);
         setDepartments(deptsRes || []);
         setAnalytics(analyticsRes);
-      } catch (err) {
-        console.error('Error loading initial data', err);
+      } catch {
+        // Initial load fallback
       } finally {
         setIsLoading(false);
       }
@@ -58,7 +59,10 @@ export default function HomePage() {
 
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackingInput.trim()) return;
+    if (!trackingInput.trim()) {
+      toast.warn('Please enter a tracking ID (e.g. FMC-2026-1001)');
+      return;
+    }
     router.push(`/complaints/${trackingInput.trim().toUpperCase()}`);
   };
 

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { HeatmapPoint } from '@/lib/types';
 import { Crosshair, Layers, Locate, MapPin } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface LeafletMapProps {
   mode: 'heatmap' | 'markers' | 'picker' | 'preview';
@@ -262,7 +263,7 @@ export default function LeafletMap({
 
   const handleDetectLocation = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.');
+      toast.error('Geolocation is not supported by your browser.');
       return;
     }
 
@@ -280,10 +281,11 @@ export default function LeafletMap({
         if (onLocationSelect) {
           onLocationSelect(latitude, longitude);
         }
+        toast.success('Current location detected successfully!');
       },
       (err) => {
         setIsLocating(false);
-        alert(`Location detection failed: ${err.message}. Using default city coordinates.`);
+        toast.error(`Location detection failed: ${err.message}. Using default city coordinates.`);
       },
       { timeout: 10000 }
     );

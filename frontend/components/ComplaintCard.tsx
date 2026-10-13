@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Complaint } from '@/lib/types';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
@@ -9,6 +10,7 @@ import { SlaBadge } from './SlaBadge';
 import { ThumbsUp, MapPin, Building2, Clock, MessageSquare } from 'lucide-react';
 import { apiToggleUpvote } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'react-toastify';
 
 interface ComplaintCardProps {
   complaint: Complaint;
@@ -16,6 +18,7 @@ interface ComplaintCardProps {
 }
 
 export function ComplaintCard({ complaint, onUpvoteChange }: ComplaintCardProps) {
+  const router = useRouter();
   const { user } = useAuth();
   const [upvotes, setUpvotes] = useState<number>(complaint.upvotes_count || 0);
   const [hasUpvoted, setHasUpvoted] = useState<boolean>(complaint.has_upvoted || false);
@@ -26,7 +29,8 @@ export function ComplaintCard({ complaint, onUpvoteChange }: ComplaintCardProps)
     e.stopPropagation();
 
     if (!user) {
-      window.location.href = '/login';
+      toast.info('Please sign in to upvote complaints.');
+      router.push('/login');
       return;
     }
 
@@ -37,11 +41,16 @@ export function ComplaintCard({ complaint, onUpvoteChange }: ComplaintCardProps)
       const res = await apiToggleUpvote(complaint.id);
       setUpvotes(res.upvotes_count);
       setHasUpvoted(res.has_upvoted);
+      if (res.has_upvoted) {
+        toast.success(`Upvoted #${complaint.tracking_number}!`);
+      } else {
+        toast.info(`Upvote removed from #${complaint.tracking_number}.`);
+      }
       if (onUpvoteChange) {
         onUpvoteChange(complaint.id, res.upvotes_count, res.has_upvoted);
       }
-    } catch (err) {
-      console.error('Failed to toggle upvote', err);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update upvote.');
     } finally {
       setIsVoting(false);
     }

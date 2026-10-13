@@ -3,16 +3,16 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, ArrowRight } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 export default function TrackPage() {
   const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [error, setError] = useState('');
 
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackingNumber.trim()) {
-      setError('Please enter a valid tracking number.');
+      toast.warn('Please enter a valid tracking number.');
       return;
     }
     router.push(`/complaints/${trackingNumber.trim().toUpperCase()}`);
@@ -49,10 +49,7 @@ export default function TrackPage() {
               <input
                 type="text"
                 value={trackingNumber}
-                onChange={(e) => {
-                  setTrackingNumber(e.target.value);
-                  setError('');
-                }}
+                onChange={(e) => setTrackingNumber(e.target.value)}
                 placeholder="e.g. FMC-2026-1001"
                 className="w-full pl-4 pr-32 py-3 text-sm font-mono bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground placeholder:text-muted-foreground uppercase outline-none"
               />
@@ -64,12 +61,11 @@ export default function TrackPage() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            {error && <p className="mt-2 text-xs text-destructive font-medium">{error}</p>}
           </div>
         </form>
 
         {/* Quick Sample Identifiers */}
-        <div className="mt-8 pt-6 border-t border-border">
+        {/* <div className="mt-8 pt-6 border-t border-border">
           <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-3">
             Quick Test Identifiers:
           </p>
@@ -93,7 +89,7 @@ export default function TrackPage() {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );

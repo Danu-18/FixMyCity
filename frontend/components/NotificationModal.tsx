@@ -6,6 +6,7 @@ import { apiGetNotifications, apiMarkAllNotificationsRead, apiMarkNotificationRe
 import { NotificationItem } from '@/lib/types';
 import { Bell, CheckCheck, ExternalLink, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'react-toastify';
 
 interface NotificationModalProps {
   isOpen: boolean;
@@ -36,17 +37,27 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
   }, [isOpen]);
 
   const handleMarkRead = async (id: number) => {
-    await apiMarkNotificationRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
-    refreshNotifications();
+    try {
+      await apiMarkNotificationRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+      );
+      refreshNotifications();
+      toast.info('Notification marked as read.');
+    } catch {
+      toast.error('Failed to update notification status.');
+    }
   };
 
   const handleMarkAllRead = async () => {
-    await apiMarkAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    refreshNotifications();
+    try {
+      await apiMarkAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      refreshNotifications();
+      toast.success('All notifications marked as read.');
+    } catch {
+      toast.error('Failed to mark all as read.');
+    }
   };
 
   if (!isOpen) return null;
