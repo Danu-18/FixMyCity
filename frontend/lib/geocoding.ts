@@ -1,5 +1,6 @@
 /**
- * Utility functions for OpenStreetMap Nominatim Geocoding and Reverse-Geocoding.
+ * Utility functions for OpenStreetMap Nominatim Geocoding and Reverse-Geocoding
+ * with Pakistan Geo-Fencing enforcement.
  */
 
 export interface GeocodeResult {
@@ -7,6 +8,31 @@ export interface GeocodeResult {
   lng: number;
   displayName: string;
   formattedAddress: string;
+}
+
+/**
+ * Exact geographical bounding box for Pakistan.
+ * SouthWest: [23.6946, 60.8729], NorthEast: [37.0841, 77.8374]
+ */
+export const PAKISTAN_BOUNDS = {
+  southWest: [23.6946, 60.8729] as [number, number],
+  northEast: [37.0841, 77.8374] as [number, number],
+  minLat: 23.6946,
+  maxLat: 37.0841,
+  minLng: 60.8729,
+  maxLng: 77.8374,
+};
+
+/**
+ * Verifies if the specified coordinates fall strictly inside Pakistan's bounding box.
+ */
+export function isWithinPakistan(lat: number, lng: number): boolean {
+  return (
+    lat >= PAKISTAN_BOUNDS.minLat &&
+    lat <= PAKISTAN_BOUNDS.maxLat &&
+    lng >= PAKISTAN_BOUNDS.minLng &&
+    lng <= PAKISTAN_BOUNDS.maxLng
+  );
 }
 
 /**
@@ -62,7 +88,8 @@ export function formatNominatimAddress(data: any): string {
 }
 
 /**
- * Searches coordinates by address query string using OpenStreetMap Nominatim API.
+ * Searches coordinates by address query string using OpenStreetMap Nominatim API,
+ * strictly geo-fenced to Pakistan with &countrycodes=pk.
  */
 export async function searchAddressNominatim(query: string): Promise<GeocodeResult | null> {
   const trimmed = query.trim();
@@ -70,7 +97,7 @@ export async function searchAddressNominatim(query: string): Promise<GeocodeResu
 
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
     trimmed
-  )}&limit=1&addressdetails=1&accept-language=en`;
+  )}&limit=1&addressdetails=1&accept-language=en&countrycodes=pk`;
 
   const res = await fetch(url, {
     headers: {
@@ -91,7 +118,7 @@ export async function searchAddressNominatim(query: string): Promise<GeocodeResu
   const lat = parseFloat(first.lat);
   const lng = parseFloat(first.lon);
 
-  if (isNaN(lat) || isNaN(lng)) {
+  if (isNaN(lat) || isNaN(lng) || !isWithinPakistan(lat, lng)) {
     return null;
   }
 
@@ -104,9 +131,62 @@ export async function searchAddressNominatim(query: string): Promise<GeocodeResu
 }
 
 /**
+ * Searches multiple matching address locations for live autocomplete dropdown,
+ * strictly geo-fenced to Pakistan with &countrycodes=pk.
+ */
+export async function searchAddressesNominatim(
+  query: string,
+  limit: number = 6
+): Promise<GeocodeResult[]> {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length < 2) return [];
+
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    trimmed
+  )}&limit=${limit}&addressdetails=1&accept-language=en&countrycodes=pk`;
+
+  const res = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Nominatim geocoding failed (Status ${res.status})`);
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) {
+    return [];
+  }
+
+  return data
+    .map((item: any) => {
+      const lat = parseFloat(item.lat);
+      const lng = parseFloat(item.lon);
+
+      if (isNaN(lat) || isNaN(lng) || !isWithinPakistan(lat, lng)) {
+        return null;
+      }
+
+      return {
+        lat,
+        lng,
+        displayName: item.display_name || '',
+        formattedAddress: formatNominatimAddress(item),
+      };
+    })
+    .filter((item): item is GeocodeResult => item !== null);
+}
+
+/**
  * Reverse geocodes latitude & longitude into a human-readable street address using Nominatim API.
  */
 export async function reverseGeocodeNominatim(lat: number, lng: number): Promise<GeocodeResult | null> {
+  if (!isWithinPakistan(lat, lng)) {
+    return null;
+  }
+
   const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=en`;
 
   const res = await fetch(url, {

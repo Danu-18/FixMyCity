@@ -6,7 +6,13 @@ import { useRouter } from 'next/navigation';
 import { apiGetCategories, apiSubmitComplaint } from '@/lib/api';
 import { Category, Complaint } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
-import { searchAddressNominatim, reverseGeocodeNominatim } from '@/lib/geocoding';
+import {
+  GeocodeResult,
+  searchAddressNominatim,
+  searchAddressesNominatim,
+  reverseGeocodeNominatim,
+  isWithinPakistan,
+} from '@/lib/geocoding';
 import {
   Building2,
   Camera,
@@ -51,7 +57,32 @@ export default function ReportComplaintPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [searchResults, setSearchResults] = useState<GeocodeResult[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const lastGeocodeReqId = useRef(0);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dropdownContainerRef = useRef<HTMLDivElement>(null);
+  const activeSearchReqId = useRef(0);
+
+  // Close autocomplete dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        dropdownContainerRef.current &&
+        !dropdownContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   // Submission Status
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,6 +117,11 @@ export default function ReportComplaintPage() {
   };
 
   const handleLocationSelect = async (selectedLat: number, selectedLng: number) => {
+    if (!isWithinPakistan(selectedLat, selectedLng)) {
+      toast.error('Location must be within Pakistan.');
+      return;
+    }
+
     setLat(selectedLat);
     setLng(selectedLng);
 
@@ -105,6 +141,53 @@ export default function ReportComplaintPage() {
     }
   };
 
+  const triggerDebouncedAutocomplete = (query: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setIsDropdownOpen(false);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      const reqId = ++activeSearchReqId.current;
+      try {
+        const results = await searchAddressesNominatim(trimmed, 6);
+        if (reqId === activeSearchReqId.current) {
+          setSearchResults(results);
+          setIsDropdownOpen(results.length > 0);
+        }
+      } catch (err) {
+        console.error('Autocomplete fetch error:', err);
+      } finally {
+        if (reqId === activeSearchReqId.current) {
+          setIsSearching(false);
+        }
+      }
+    }, 300);
+  };
+
+  const handleAddressInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setAddress(value);
+    triggerDebouncedAutocomplete(value);
+  };
+
+  const handleSelectSuggestion = (item: GeocodeResult) => {
+    setAddress(item.formattedAddress || item.displayName);
+    setLat(item.lat);
+    setLng(item.lng);
+    setIsDropdownOpen(false);
+    setSearchResults([]);
+    toast.success(`Selected: ${item.formattedAddress || item.displayName}`);
+  };
+
   const handleSearchAddress = async () => {
     const query = address.trim();
     if (!query) {
@@ -121,9 +204,11 @@ export default function ReportComplaintPage() {
         if (result.formattedAddress) {
           setAddress(result.formattedAddress);
         }
+        setIsDropdownOpen(false);
+        setSearchResults([]);
         toast.success(`Location found: ${result.formattedAddress || result.displayName}`);
       } else {
-        toast.error('Location not found. Try including a city or landmark (e.g. "DHA Phase 6, Karachi").');
+        toast.error('Location not found within Pakistan. Try including a city or landmark (e.g. "DHA Phase 6, Karachi").');
       }
     } catch {
       toast.error('Search failed. Please check your internet connection.');
@@ -142,6 +227,14 @@ export default function ReportComplaintPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
+
+        // Pakistan Geo-fence validation check
+        if (!isWithinPakistan(latitude, longitude)) {
+          setIsLocating(false);
+          toast.error('Location must be within Pakistan.');
+          return;
+        }
+
         setLat(latitude);
         setLng(longitude);
 
@@ -464,21 +557,63 @@ export default function ReportComplaintPage() {
               Street Address or Landmark
             </label>
             <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
+              <div ref={dropdownContainerRef} className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={handleAddressInputChange}
+                  onFocus={() => {
+                    if (searchResults.length > 0) setIsDropdownOpen(true);
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Escape') {
+                      setIsDropdownOpen(false);
+                    } else if (e.key === 'Enter') {
                       e.preventDefault();
-                      handleSearchAddress();
+                      if (searchResults.length > 0 && isDropdownOpen) {
+                        handleSelectSuggestion(searchResults[0]);
+                      } else {
+                        handleSearchAddress();
+                      }
                     }
                   }}
-                  placeholder="e.g. DHA Phase 6, Karachi or Saddar Town"
-                  className="w-full text-xs bg-background border border-input rounded-lg pl-9 pr-3.5 py-2.5 focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none transition-colors"
+                  placeholder="Search street, neighborhood or landmark (e.g. DHA Phase 6, Karachi)"
+                  className="w-full text-xs bg-background border border-input rounded-lg pl-9 pr-8 py-2.5 focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none transition-colors"
                 />
+
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  </div>
+                )}
+
+                {/* Autocomplete Dropdown */}
+                {isDropdownOpen && searchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-popover border border-border rounded-xl shadow-xl overflow-hidden max-h-72 overflow-y-auto">
+                    <ul className="divide-y divide-border">
+                      {searchResults.map((item, index) => (
+                        <li key={`${item.lat}-${item.lng}-${index}`}>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSuggestion(item)}
+                            className="w-full text-left px-3.5 py-2.5 hover:bg-accent hover:text-accent-foreground transition-colors flex items-start gap-2.5 group cursor-pointer"
+                          >
+                            <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-foreground truncate">
+                                {item.formattedAddress || item.displayName.split(',')[0]}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                                {item.displayName}
+                              </div>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2">
@@ -513,7 +648,7 @@ export default function ReportComplaintPage() {
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1.5">
-              Type an address and press Enter or Search, click Locate Me, or drag the pin on the map.
+              Live autocomplete enabled for Pakistan. Pick from suggestions or drag the pin.
             </p>
           </div>
 

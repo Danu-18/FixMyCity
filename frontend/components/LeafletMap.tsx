@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { HeatmapPoint } from '@/lib/types';
 import { Crosshair, Layers, Locate, MapPin } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { PAKISTAN_BOUNDS, isWithinPakistan } from '@/lib/geocoding';
 
 interface LeafletMapProps {
   mode: 'heatmap' | 'markers' | 'picker' | 'preview';
@@ -74,6 +75,12 @@ export default function LeafletMap({
           center: initialCenter as [number, number],
           zoom,
           scrollWheelZoom: true,
+          maxBounds: [
+            PAKISTAN_BOUNDS.southWest,
+            PAKISTAN_BOUNDS.northEast,
+          ],
+          maxBoundsViscosity: 1.0,
+          minZoom: 5,
         });
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -88,6 +95,10 @@ export default function LeafletMap({
         if (mode === 'picker') {
           map.on('click', (e: any) => {
             const { lat, lng } = e.latlng;
+            if (!isWithinPakistan(lat, lng)) {
+              toast.error('Location must be within Pakistan.');
+              return;
+            }
             isInternalInteractionRef.current = true;
             updatePickerMarker(lat, lng, L);
             if (onLocationSelectRef.current) {
@@ -169,6 +180,13 @@ export default function LeafletMap({
         marker.on('dragend', (e: any) => {
           isInternalInteractionRef.current = true;
           const pos = e.target.getLatLng();
+          if (!isWithinPakistan(pos.lat, pos.lng)) {
+            toast.error('Location must be within Pakistan.');
+            if (selectedLocation) {
+              marker.setLatLng([selectedLocation.lat, selectedLocation.lng]);
+            }
+            return;
+          }
           if (onLocationSelectRef.current) {
             onLocationSelectRef.current(pos.lat, pos.lng);
           }
@@ -294,6 +312,12 @@ export default function LeafletMap({
       (pos) => {
         setIsLocating(false);
         const { latitude, longitude } = pos.coords;
+
+        if (!isWithinPakistan(latitude, longitude)) {
+          toast.error('Location must be within Pakistan.');
+          return;
+        }
+
         if (mapInstanceRef.current) {
           mapInstanceRef.current.flyTo([latitude, longitude], 15, { duration: 1.2 });
           import('leaflet').then((module) => {
