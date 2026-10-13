@@ -1,17 +1,21 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { apiGetCategories, apiSubmitComplaint } from '@/lib/api';
 import { Category, Complaint } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
+import { searchAddressNominatim, reverseGeocodeNominatim } from '@/lib/geocoding';
 import {
   Building2,
   Camera,
   CheckCircle2,
   Clock,
+  Crosshair,
   Loader2,
+  MapPin,
+  Search,
   Send,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -42,6 +46,12 @@ export default function ReportComplaintPage() {
   const [lng, setLng] = useState<number>(67.0011);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Geocoding & Location Status
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const lastGeocodeReqId = useRef(0);
 
   // Submission Status
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,9 +85,91 @@ export default function ReportComplaintPage() {
     }
   };
 
-  const handleLocationSelect = (selectedLat: number, selectedLng: number) => {
+  const handleLocationSelect = async (selectedLat: number, selectedLng: number) => {
     setLat(selectedLat);
     setLng(selectedLng);
+
+    const reqId = ++lastGeocodeReqId.current;
+    setIsReverseGeocoding(true);
+    try {
+      const result = await reverseGeocodeNominatim(selectedLat, selectedLng);
+      if (reqId === lastGeocodeReqId.current && result && (result.formattedAddress || result.displayName)) {
+        setAddress(result.formattedAddress || result.displayName);
+      }
+    } catch (err) {
+      console.error('Reverse geocode error:', err);
+    } finally {
+      if (reqId === lastGeocodeReqId.current) {
+        setIsReverseGeocoding(false);
+      }
+    }
+  };
+
+  const handleSearchAddress = async () => {
+    const query = address.trim();
+    if (!query) {
+      toast.warn('Please enter an address or landmark to search.');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const result = await searchAddressNominatim(query);
+      if (result) {
+        setLat(result.lat);
+        setLng(result.lng);
+        if (result.formattedAddress) {
+          setAddress(result.formattedAddress);
+        }
+        toast.success(`Location found: ${result.formattedAddress || result.displayName}`);
+      } else {
+        toast.error('Location not found. Try including a city or landmark (e.g. "DHA Phase 6, Karachi").');
+      }
+    } catch {
+      toast.error('Search failed. Please check your internet connection.');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleLocateMe = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setLat(latitude);
+        setLng(longitude);
+
+        const reqId = ++lastGeocodeReqId.current;
+        setIsReverseGeocoding(true);
+        try {
+          const result = await reverseGeocodeNominatim(latitude, longitude);
+          if (reqId === lastGeocodeReqId.current && result && (result.formattedAddress || result.displayName)) {
+            setAddress(result.formattedAddress || result.displayName);
+            toast.success(`Current location: ${result.formattedAddress || result.displayName}`);
+          } else {
+            toast.success(`GPS coordinates detected: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          }
+        } catch {
+          toast.success(`GPS coordinates detected: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        } finally {
+          if (reqId === lastGeocodeReqId.current) {
+            setIsReverseGeocoding(false);
+          }
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        setIsLocating(false);
+        toast.error(`Location detection failed: ${err.message}.`);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -355,29 +447,83 @@ export default function ReportComplaintPage() {
 
         {/* Step 3: Location Coordinates & Leaflet Picker */}
         <div className="bg-card border border-border rounded-xl p-6 shadow-xs space-y-4">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-primary mb-2">
-            3. Exact Geo-Location
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
+              3. Exact Geo-Location
+            </h2>
+            {isReverseGeocoding && (
+              <span className="text-[11px] text-primary flex items-center gap-1.5 animate-pulse font-medium">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Resolving address from pin...
+              </span>
+            )}
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1.5">
               Street Address or Landmark
             </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="e.g. Block 7, Main Commercial Road, Near Al-Mustafa Center"
-              className="w-full text-xs bg-background border border-input rounded-lg px-3.5 py-2.5 focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
-            />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearchAddress();
+                    }
+                  }}
+                  placeholder="e.g. DHA Phase 6, Karachi or Saddar Town"
+                  className="w-full text-xs bg-background border border-input rounded-lg pl-9 pr-3.5 py-2.5 focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none transition-colors"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSearchAddress}
+                  disabled={isSearching || !address.trim()}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-primary text-primary-foreground text-xs font-semibold rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
+                >
+                  {isSearching ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Search className="w-3.5 h-3.5" />
+                  )}
+                  <span>Search</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLocateMe}
+                  disabled={isLocating}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-background border border-input hover:bg-accent hover:text-accent-foreground text-foreground text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 shadow-xs cursor-pointer"
+                  title="Detect my current physical location"
+                >
+                  {isLocating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                  ) : (
+                    <Crosshair className="w-3.5 h-3.5 text-primary" />
+                  )}
+                  <span className="whitespace-nowrap">Locate Me</span>
+                </button>
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1.5">
+              Type an address and press Enter or Search, click Locate Me, or drag the pin on the map.
+            </p>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-foreground">
+              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
                 Map Coordinates: {lat.toFixed(5)}, {lng.toFixed(5)}
               </span>
-              <span className="text-[11px] text-muted-foreground">Click map to move pin</span>
+              <span className="text-[11px] text-muted-foreground">Click map or drag marker to reposition</span>
             </div>
 
             <LeafletMap

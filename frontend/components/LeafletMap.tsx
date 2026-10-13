@@ -31,10 +31,16 @@ export default function LeafletMap({
   const heatLayerRef = useRef<any>(null);
   const markersGroupRef = useRef<any>(null);
   const pickerMarkerRef = useRef<any>(null);
+  const onLocationSelectRef = useRef(onLocationSelect);
+  const isInternalInteractionRef = useRef<boolean>(false);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [activeLayer, setActiveLayer] = useState<'heatmap' | 'markers'>(
     mode === 'heatmap' ? 'heatmap' : 'markers'
   );
+
+  useEffect(() => {
+    onLocationSelectRef.current = onLocationSelect;
+  }, [onLocationSelect]);
 
   useEffect(() => {
     async function initMap() {
@@ -82,9 +88,10 @@ export default function LeafletMap({
         if (mode === 'picker') {
           map.on('click', (e: any) => {
             const { lat, lng } = e.latlng;
+            isInternalInteractionRef.current = true;
             updatePickerMarker(lat, lng, L);
-            if (onLocationSelect) {
-              onLocationSelect(lat, lng);
+            if (onLocationSelectRef.current) {
+              onLocationSelectRef.current(lat, lng);
             }
           });
         }
@@ -124,14 +131,25 @@ export default function LeafletMap({
     }
   }, [points, activeLayer, mode]);
 
-  // Update picker marker when selectedLocation changes from outside
+  // Update picker marker and fly to coordinates when selectedLocation changes externally
   useEffect(() => {
     if (mapInstanceRef.current && (mode === 'picker' || mode === 'preview') && selectedLocation) {
+      const map = mapInstanceRef.current;
       import('leaflet').then((module) => {
         updatePickerMarker(selectedLocation.lat, selectedLocation.lng, module.default);
       });
+
+      // If change wasn't triggered by internal dragging or clicking, smoothly fly to new location
+      if (!isInternalInteractionRef.current) {
+        map.flyTo(
+          [selectedLocation.lat, selectedLocation.lng],
+          Math.max(map.getZoom() || 13, 15),
+          { duration: 1.2 }
+        );
+      }
+      isInternalInteractionRef.current = false;
     }
-  }, [selectedLocation]);
+  }, [selectedLocation?.lat, selectedLocation?.lng, mode]);
 
   const updatePickerMarker = (lat: number, lng: number, L: any) => {
     const map = mapInstanceRef.current;
@@ -145,10 +163,14 @@ export default function LeafletMap({
       }).addTo(map);
 
       if (mode === 'picker') {
+        marker.on('dragstart', () => {
+          isInternalInteractionRef.current = true;
+        });
         marker.on('dragend', (e: any) => {
+          isInternalInteractionRef.current = true;
           const pos = e.target.getLatLng();
-          if (onLocationSelect) {
-            onLocationSelect(pos.lat, pos.lng);
+          if (onLocationSelectRef.current) {
+            onLocationSelectRef.current(pos.lat, pos.lng);
           }
         });
       }
@@ -273,21 +295,21 @@ export default function LeafletMap({
         setIsLocating(false);
         const { latitude, longitude } = pos.coords;
         if (mapInstanceRef.current) {
-          mapInstanceRef.current.setView([latitude, longitude], 15);
+          mapInstanceRef.current.flyTo([latitude, longitude], 15, { duration: 1.2 });
           import('leaflet').then((module) => {
             updatePickerMarker(latitude, longitude, module.default);
           });
         }
-        if (onLocationSelect) {
-          onLocationSelect(latitude, longitude);
+        if (onLocationSelectRef.current) {
+          onLocationSelectRef.current(latitude, longitude);
         }
         toast.success('Current location detected successfully!');
       },
       (err) => {
         setIsLocating(false);
-        toast.error(`Location detection failed: ${err.message}. Using default city coordinates.`);
+        toast.error(`Location detection failed: ${err.message}.`);
       },
-      { timeout: 10000 }
+      { timeout: 10000, enableHighAccuracy: true }
     );
   };
 
