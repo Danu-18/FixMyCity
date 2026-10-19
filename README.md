@@ -1,4 +1,4 @@
-# FixMyCity — Smart Community Complaint & Civic Issue Resolution Platform
+# FixMyCity Smart Community Complaint & Civic Issue Resolution Platform
 
 > **Academic Project Implementation**  
 > Based on the *Interim Research Report* and *Project Proposal* by **Danial Arif** (Student ID: 202539).
