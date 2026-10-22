@@ -19,7 +19,7 @@ FixMyCity is a modern digital civic governance platform designed to eliminate th
    - Interactive coordinate picker allowing residents to pinpoint exact problem locations.
 
 3. **Service Level Agreement (SLA) Turnaround Monitoring**
-   - Department- and category-specific SLA resolution deadlines (e.g. 12h for Live Wire / Missing Manhole, 24h for Water Main Leakage).
+   - Department- and category-specific SLA resolution deadlines e.g. 12h for Live Wire / Missing Manhole, 24h for Water Main Leakage.
    - Automated background monitoring command (`php artisan sla:check`) flags overdue tickets and generates urgent notifications for authority officers.
 
 4. **Community Upvoting & Civic Priority Escalation**
