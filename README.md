@@ -43,7 +43,7 @@ FixMyCity is a modern digital civic governance platform designed to eliminate th
 |---|---|
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, Lucide React |
 | **Geospatial** | Leaflet.js, OpenStreetMap tiles, Leaflet Heatmap Layer |
-| **Backend** | Laravel 12 (PHP 8.2), REST API, Eloquent ORM |
+| **Backend** | Laravel 12 PHP 8.2, REST API, Eloquent ORM |
 | **Authentication** | Laravel Sanctum token-based authentication with RBAC middleware |
 | **Database** | MySQL (`fixmycity` on port 3306) via Eloquent ORM migrations |
 | **Testing** | PHPUnit / Laravel Feature Tests (120 assertions passing) |
