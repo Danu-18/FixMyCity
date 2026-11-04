@@ -2,10 +2,13 @@
 
 namespace App\Services;
 
+use App\Mail\SlaBreachedAlertMail;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SlaMonitoringService
 {
@@ -76,6 +79,16 @@ class SlaMonitoringService
                 'message' => "Complaint '{$complaint->title}' in {$complaint->department->department_name} has exceeded its SLA resolution deadline.",
                 'type' => 'sla_breached',
             ]);
+
+            // Dispatch SLA breach email alert
+            if (!empty($staff->email)) {
+                try {
+                    $complaint->loadMissing(['department', 'category']);
+                    Mail::to($staff->email)->send(new SlaBreachedAlertMail($complaint));
+                } catch (\Throwable $e) {
+                    Log::warning("SLA breach alert email could not be sent to {$staff->email}: " . $e->getMessage());
+                }
+            }
         }
 
         // Notify admins

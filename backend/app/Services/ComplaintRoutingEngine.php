@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Mail\ComplaintStatusUpdatedMail;
 use App\Models\Category;
 use App\Models\Complaint;
 use App\Models\Notification;
@@ -9,6 +10,8 @@ use App\Models\StatusHistory;
 use App\Models\User;
 use Carbon\Carbon;
 use Exception;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class ComplaintRoutingEngine
 {
@@ -142,6 +145,18 @@ class ComplaintRoutingEngine
                 'message' => "Your complaint '{$complaint->title}' has been moved to '{$newStatus}'. " . ($notes ? "Notes: {$notes}" : ""),
                 'type' => 'status_change',
             ]);
+
+            // Dispatch status email to citizen
+            try {
+                $complaint->loadMissing(['user', 'department', 'category']);
+                if ($complaint->user && !empty($complaint->user->email)) {
+                    Mail::to($complaint->user->email)->send(
+                        new ComplaintStatusUpdatedMail($complaint, $oldStatus, $newStatus, $notes)
+                    );
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Complaint status email could not be sent: " . $e->getMessage());
+            }
         }
 
         // 2. Notify departmental staff

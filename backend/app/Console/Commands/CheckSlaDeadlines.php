@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CheckSlaDeadlinesJob;
 use App\Services\SlaMonitoringService;
 use Illuminate\Console\Command;
 
@@ -12,7 +13,7 @@ class CheckSlaDeadlines extends Command
      *
      * @var string
      */
-    protected $signature = 'sla:check';
+    protected $signature = 'sla:check {--queue : Dispatch audit job to background queue}';
 
     /**
      * The console command description.
@@ -26,6 +27,13 @@ class CheckSlaDeadlines extends Command
      */
     public function handle(SlaMonitoringService $slaService): int
     {
+        if ($this->option('queue')) {
+            CheckSlaDeadlinesJob::dispatch();
+            $this->info('FixMyCity SLA deadline audit job dispatched to queue.');
+            $this->line('Run "php artisan queue:work" to process queued background jobs.');
+            return Command::SUCCESS;
+        }
+
         $this->info('Running FixMyCity SLA deadline audit...');
         $results = $slaService->checkDeadlines();
 
