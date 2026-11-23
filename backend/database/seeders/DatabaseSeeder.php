@@ -236,6 +236,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'super_admin',
             'status' => 'active',
+            'city' => 'Islamabad',
             'phone' => '+92 300 9999999',
         ]);
 
@@ -246,6 +247,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'citizen',
             'status' => 'active',
+            'city' => 'Karachi',
             'phone' => '+92 370 3130213',
         ]);
 
@@ -255,16 +257,18 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'citizen',
             'status' => 'active',
+            'city' => 'Karachi',
             'phone' => '+92 300 1234567',
         ]);
 
-        // Authority Staff
+        // Authority Staff (Karachi)
         $staffRoads = User::create([
             'name' => 'Engr. Tariq Mehmood',
             'email' => 'roads@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
             'employee_id' => 'EMP-ROADS-101',
             'phone' => '+92 321 9876543',
@@ -276,6 +280,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'authority',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Water & Sanitation']->id,
             'employee_id' => 'EMP-WATER-202',
             'phone' => '+92 333 4567890',
@@ -287,6 +292,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'authority',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Electricity & Power Utilities']->id,
             'employee_id' => 'EMP-POWER-303',
             'phone' => '+92 312 3456789',
@@ -298,6 +304,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'authority',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Municipal Waste Management']->id,
             'employee_id' => 'EMP-WASTE-404',
             'phone' => '+92 345 6789012',
@@ -309,9 +316,23 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'authority',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Public Safety & Security']->id,
             'employee_id' => 'EMP-SAFETY-505',
             'phone' => '+92 301 2345678',
+        ]);
+
+        // Authority Staff (Lahore - for cross-city isolation testing)
+        $staffRoadsLahore = User::create([
+            'name' => 'Engr. Usman Tariq',
+            'email' => 'roads.lahore@fixmycity.org',
+            'password' => $hashedPassword,
+            'role' => 'authority',
+            'status' => 'active',
+            'city' => 'Lahore',
+            'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
+            'employee_id' => 'EMP-ROADS-LHR-101',
+            'phone' => '+92 321 1122334',
         ]);
 
         // Admin
@@ -321,6 +342,7 @@ class DatabaseSeeder extends Seeder
             'password' => $hashedPassword,
             'role' => 'admin',
             'status' => 'active',
+            'city' => 'Karachi',
             'department_id' => $deptMap['Central Administration / IT']->id,
             'phone' => '+92 300 0000000',
         ]);
@@ -445,11 +467,28 @@ class DatabaseSeeder extends Seeder
                 'lat' => 24.9123,
                 'lng' => 67.1145,
                 'address' => 'Rashid Minhas Road, Near Millennium Mall, Karachi',
+                'city' => 'Karachi',
                 'status' => 'Pending',
                 'priority' => 'Low',
                 'created_at' => Carbon::now()->subHours(30),
                 'sla_deadline' => Carbon::now()->addHours(42),
                 'upvotes' => 8,
+            ],
+            [
+                'tracking' => 'FMC-2026-1009',
+                'user' => $citizenDanial,
+                'category' => $catMap['Damaged Road / Pothole'],
+                'title' => 'Deep Road Cave-In near Liberty Roundabout',
+                'description' => 'Substantial asphalt collapse on main boulevard near Liberty roundabout causing severe traffic jam.',
+                'lat' => 31.5204,
+                'lng' => 74.3587,
+                'address' => 'Main Boulevard Gulberg, Near Liberty Roundabout, Lahore',
+                'city' => 'Lahore',
+                'status' => 'Pending',
+                'priority' => 'High',
+                'created_at' => Carbon::now()->subHours(8),
+                'sla_deadline' => Carbon::now()->addHours(40),
+                'upvotes' => 6,
             ],
         ];
 
@@ -460,6 +499,7 @@ class DatabaseSeeder extends Seeder
                 'user_id' => $sc['user']->id,
                 'category_id' => $cat->id,
                 'department_id' => $cat->department_id,
+                'city' => $sc['city'] ?? 'Karachi',
                 'title' => $sc['title'],
                 'description' => $sc['description'],
                 'latitude' => $sc['lat'],

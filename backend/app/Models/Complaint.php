@@ -17,6 +17,7 @@ class Complaint extends Model
         'user_id',
         'category_id',
         'department_id',
+        'city',
         'title',
         'description',
         'image_path',

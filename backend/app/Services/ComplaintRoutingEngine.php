@@ -159,9 +159,12 @@ class ComplaintRoutingEngine
             }
         }
 
-        // 2. Notify departmental staff
+        // 2. Notify departmental staff in the same jurisdiction (department and city)
         $staffMembers = User::where('role', 'authority')
             ->where('department_id', $complaint->department_id)
+            ->when(!empty($complaint->city), function ($q) use ($complaint) {
+                $q->where('city', $complaint->city);
+            })
             ->get();
 
         foreach ($staffMembers as $staff) {

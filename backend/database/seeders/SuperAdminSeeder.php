@@ -20,6 +20,7 @@ class SuperAdminSeeder extends Seeder
                 'password' => Hash::make('password123'),
                 'role' => 'super_admin',
                 'status' => 'active',
+                'city' => 'Islamabad',
                 'phone' => '+92 300 9999999',
             ]
         );

@@ -8,14 +8,26 @@ use App\Models\Complaint;
 use App\Models\Department;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsController extends Controller
 {
-    public function overview(): JsonResponse
+    public function overview(Request $request): JsonResponse
     {
-        $totalComplaints = Complaint::count();
-        $statusCounts = Complaint::select('status', DB::raw('count(*) as count'))
+        $city = $request->query('city');
+        $currentUser = $request->user('sanctum');
+        if ($currentUser && $currentUser->isAuthority() && !empty($currentUser->city)) {
+            $city = $currentUser->city;
+        }
+
+        $baseComplaintQuery = Complaint::query();
+        if ($city) {
+            $baseComplaintQuery->where('city', $city);
+        }
+
+        $totalComplaints = (clone $baseComplaintQuery)->count();
+        $statusCounts = (clone $baseComplaintQuery)->select('status', DB::raw('count(*) as count'))
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
@@ -28,7 +40,7 @@ class AnalyticsController extends Controller
         $now = Carbon::now();
 
         // SLA compliance calculation
-        $resolvedComplaints = Complaint::where('status', 'Resolved')
+        $resolvedComplaints = (clone $baseComplaintQuery)->where('status', 'Resolved')
             ->whereNotNull('sla_deadline')
             ->whereNotNull('resolved_at')
             ->get();
@@ -53,17 +65,26 @@ class AnalyticsController extends Controller
             : 100.0;
 
         // Active SLA breaches
-        $activeBreachedCount = Complaint::whereIn('status', ['Pending', 'In Progress'])
+        $activeBreachedCount = (clone $baseComplaintQuery)->whereIn('status', ['Pending', 'In Progress'])
             ->whereNotNull('sla_deadline')
             ->where('sla_deadline', '<', $now)
             ->count();
 
         // Department breakdown
-        $departments = Department::withCount('complaints')
+        $departments = Department::withCount(['complaints' => function ($q) use ($city) {
+                if ($city) {
+                    $q->where('city', $city);
+                }
+            }])
             ->get()
-            ->map(function ($d) use ($now) {
-                $resolved = Complaint::where('department_id', $d->id)->where('status', 'Resolved')->count();
-                $breached = Complaint::where('department_id', $d->id)
+            ->map(function ($d) use ($now, $city) {
+                $deptQuery = Complaint::where('department_id', $d->id);
+                if ($city) {
+                    $deptQuery->where('city', $city);
+                }
+
+                $resolved = (clone $deptQuery)->where('status', 'Resolved')->count();
+                $breached = (clone $deptQuery)
                     ->whereIn('status', ['Pending', 'In Progress'])
                     ->where('sla_deadline', '<', $now)
                     ->count();
@@ -79,7 +100,11 @@ class AnalyticsController extends Controller
             });
 
         // Category distribution
-        $categories = Category::withCount('complaints')
+        $categories = Category::withCount(['complaints' => function ($q) use ($city) {
+                if ($city) {
+                    $q->where('city', $city);
+                }
+            }])
             ->orderBy('complaints_count', 'desc')
             ->take(8)
             ->get()

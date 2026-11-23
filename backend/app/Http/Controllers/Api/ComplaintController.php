@@ -43,8 +43,22 @@ class ComplaintController extends Controller
             }
         }
 
-        if ($departmentId = $request->query('department_id')) {
-            $query->where('department_id', $departmentId);
+        $currentUser = $request->user('sanctum');
+
+        // Authority jurisdiction scoping: strictly scoped to department_id === user.department_id AND city === user.city
+        if ($currentUser && $currentUser->isAuthority()) {
+            $query->where('department_id', $currentUser->department_id);
+            if (!empty($currentUser->city)) {
+                $query->where('city', $currentUser->city);
+            }
+        } else {
+            if ($departmentId = $request->query('department_id')) {
+                $query->where('department_id', $departmentId);
+            }
+
+            if ($city = $request->query('city')) {
+                $query->where('city', $city);
+            }
         }
 
         if ($categoryId = $request->query('category_id')) {
@@ -56,7 +70,6 @@ class ComplaintController extends Controller
         }
 
         // Current user complaints filter
-        $currentUser = $request->user('sanctum');
         if ($request->boolean('mine') && $currentUser) {
             $query->where('user_id', $currentUser->id);
         }
@@ -154,6 +167,7 @@ class ComplaintController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'required|string',
             'category_id' => 'required|exists:categories,id',
+            'city' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
             'address' => 'nullable|string|max:255',
@@ -184,6 +198,7 @@ class ComplaintController extends Controller
             'user_id' => $user ? $user->id : null,
             'category_id' => (int) $validated['category_id'],
             'department_id' => $routing['department_id'],
+            'city' => $validated['city'],
             'title' => $validated['title'],
             'description' => $validated['description'],
             'image_path' => $imagePath,
@@ -234,11 +249,19 @@ class ComplaintController extends Controller
         $complaint = Complaint::findOrFail($id);
         $user = $request->user();
 
-        // Check department access if authority
-        if ($user->role === 'authority' && $user->department_id !== $complaint->department_id) {
-            return response()->json([
-                'message' => 'Unauthorized: You can only update complaints assigned to your department.',
-            ], 403);
+        // Check department access and city jurisdiction if authority
+        if ($user->role === 'authority') {
+            if ($user->department_id !== $complaint->department_id) {
+                return response()->json([
+                    'message' => 'Unauthorized: You can only update complaints assigned to your department.',
+                ], 403);
+            }
+
+            if (!empty($user->city) && $user->city !== $complaint->city) {
+                return response()->json([
+                    'message' => 'Unauthorized: You can only update complaints within your assigned city jurisdiction.',
+                ], 403);
+            }
         }
 
         $validated = $request->validate([

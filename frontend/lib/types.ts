@@ -6,6 +6,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  city?: string | null;
   status?: UserStatus;
   phone?: string | null;
   department_id?: number | null;
@@ -67,6 +68,7 @@ export interface Complaint {
   user_id?: number | null;
   category_id: number;
   department_id: number;
+  city?: string | null;
   title: string;
   description: string;
   image_path?: string | null;
@@ -105,6 +107,7 @@ export interface HeatmapPoint {
   intensity: number;
   category: string;
   department: string;
+  city?: string | null;
   status: string;
   priority: string;
   address?: string | null;

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { PAKISTAN_CITIES } from '@/lib/constants';
 
 // Dynamically import LeafletMap with ssr: false
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
@@ -31,6 +32,7 @@ export default function ExploreMapPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Filters
+  const [selectedCity, setSelectedCity] = useState<string>('');
   const [selectedDept, setSelectedDept] = useState<string>('');
   const [selectedCat, setSelectedCat] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -40,6 +42,7 @@ export default function ExploreMapPage() {
     setIsLoading(true);
     try {
       const res = await apiGetHeatmap({
+        city: selectedCity || undefined,
         department_id: selectedDept || undefined,
         category_id: selectedCat || undefined,
         status: selectedStatus !== 'All' ? selectedStatus : undefined,
@@ -70,7 +73,7 @@ export default function ExploreMapPage() {
 
   useEffect(() => {
     fetchHeatmapData();
-  }, [selectedDept, selectedCat, selectedStatus]);
+  }, [selectedCity, selectedDept, selectedCat, selectedStatus]);
 
   const urgentHotspots = points.filter((p) => p.priority === 'Urgent').length;
   const resolvedCount = points.filter((p) => p.status === 'Resolved').length;
@@ -115,6 +118,25 @@ export default function ExploreMapPage() {
       {/* Filter Toolbar */}
       <div className="bg-card border border-border rounded-xl p-4 mb-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 flex-1">
+          {/* City Filter */}
+          <div className="min-w-[150px]">
+            <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">
+              City
+            </label>
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="w-full text-xs bg-background border border-input rounded-lg px-2.5 py-1.5 text-foreground outline-none"
+            >
+              <option value="">All Cities</option>
+              {PAKISTAN_CITIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Department Filter */}
           <div className="min-w-[180px]">
             <label className="block text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-wider">

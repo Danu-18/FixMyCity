@@ -16,6 +16,7 @@ import {
   Loader2,
   Lock,
   Mail,
+  MapPin,
   Phone,
   ShieldCheck,
   UploadCloud,
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { PAKISTAN_CITIES } from '@/lib/constants';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,6 +33,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'citizen' | 'authority'>('citizen');
   const [departmentId, setDepartmentId] = useState<string>('');
@@ -43,6 +46,7 @@ export default function RegisterPage() {
   const [submittedStaffData, setSubmittedStaffData] = useState<{
     name: string;
     email: string;
+    city: string;
     departmentName: string;
     employeeId: string;
     fileName: string;
@@ -87,6 +91,11 @@ export default function RegisterPage() {
       if (phone.trim()) formData.append('phone', phone.trim());
 
       if (role === 'authority') {
+        if (!city.trim()) {
+          toast.error('Please select your assigned city jurisdiction.');
+          setIsLoading(false);
+          return;
+        }
         if (!departmentId) {
           toast.error('Please select your municipal department.');
           setIsLoading(false);
@@ -102,9 +111,14 @@ export default function RegisterPage() {
           setIsLoading(false);
           return;
         }
+        formData.append('city', city.trim());
         formData.append('department_id', departmentId);
         formData.append('employee_id', employeeId.trim());
         formData.append('verification_document', verificationDocument);
+      } else {
+        if (city.trim()) {
+          formData.append('city', city.trim());
+        }
       }
 
       await register(formData);
@@ -114,6 +128,7 @@ export default function RegisterPage() {
         setSubmittedStaffData({
           name: name.trim(),
           email: email.trim(),
+          city: city.trim(),
           departmentName: selectedDept?.department_name || 'Municipal Department',
           employeeId: employeeId.trim(),
           fileName: verificationDocument?.name || 'Uploaded Document',
@@ -164,6 +179,13 @@ export default function RegisterPage() {
             <div className="flex justify-between items-center py-1 border-b border-border/60">
               <span className="text-muted-foreground font-medium">Work Email</span>
               <span className="font-semibold text-foreground">{submittedStaffData.email}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-border/60">
+              <span className="text-muted-foreground font-medium">City Jurisdiction</span>
+              <span className="font-semibold text-foreground flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-primary" />
+                {submittedStaffData.city}
+              </span>
             </div>
             <div className="flex justify-between items-center py-1 border-b border-border/60">
               <span className="text-muted-foreground font-medium">Department</span>
@@ -300,9 +322,55 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          {/* Optional City Dropdown for Citizens */}
+          {role === 'citizen' && (
+            <div>
+              <label className="block text-xs font-bold text-foreground mb-1">
+                Your City (Optional)
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                <select
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
+                >
+                  <option value="">Select City (Optional)</option>
+                  {PAKISTAN_CITIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           {/* Conditional Municipal Staff Fields */}
           {role === 'authority' && (
             <>
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1">
+                  City Jurisdiction *
+                </label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  <select
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    required
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
+                  >
+                    <option value="" disabled>Select Municipal City</option>
+                    {PAKISTAN_CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-foreground mb-1">
                   Assigned Municipal Department *

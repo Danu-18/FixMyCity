@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { PAKISTAN_CITIES } from '@/lib/constants';
 
 function ComplaintsContent() {
   const searchParams = useSearchParams();
@@ -29,6 +30,7 @@ function ComplaintsContent() {
   const [search, setSearch] = useState<string>('');
   const [departmentId, setDepartmentId] = useState<string>(initialDept);
   const [categoryId, setCategoryId] = useState<string>('');
+  const [city, setCity] = useState<string>('');
   const [status, setStatus] = useState<string>('All');
   const [slaStatus, setSlaStatus] = useState<string>('');
   const [sort, setSort] = useState<string>('newest');
@@ -41,6 +43,7 @@ function ComplaintsContent() {
         search: search.trim() || undefined,
         department_id: departmentId || undefined,
         category_id: categoryId || undefined,
+        city: city || undefined,
         status: status !== 'All' ? status : undefined,
         sla_status: slaStatus || undefined,
         sort,
@@ -73,7 +76,7 @@ function ComplaintsContent() {
 
   useEffect(() => {
     fetchComplaints();
-  }, [departmentId, categoryId, status, slaStatus, sort, page]);
+  }, [departmentId, categoryId, city, status, slaStatus, sort, page]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +88,7 @@ function ComplaintsContent() {
     setSearch('');
     setDepartmentId('');
     setCategoryId('');
+    setCity('');
     setStatus('All');
     setSlaStatus('');
     setSort('newest');
@@ -143,7 +147,29 @@ function ComplaintsContent() {
         </form>
 
         {/* Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-3 border-t border-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-3 border-t border-border">
+          {/* City */}
+          <div>
+            <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+              City
+            </label>
+            <select
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                setPage(1);
+              }}
+              className="w-full text-xs bg-background border border-input rounded-lg px-2.5 py-1.5 text-foreground outline-none"
+            >
+              <option value="">All Cities</option>
+              {PAKISTAN_CITIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Status */}
           <div>
             <label className="block text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">

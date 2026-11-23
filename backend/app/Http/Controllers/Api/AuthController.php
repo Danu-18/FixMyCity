@@ -18,6 +18,7 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'phone' => 'nullable|string|max:30',
+            'city' => 'nullable|string|max:100',
             'role' => 'nullable|string|in:citizen,authority', // Explicitly block super_admin and admin
         ];
 
@@ -26,6 +27,7 @@ class AuthController extends Controller
         if ($role === 'authority') {
             $rules['department_id'] = 'required|exists:departments,id';
             $rules['employee_id'] = 'required|string|max:100';
+            $rules['city'] = 'required|string|max:100';
             $rules['verification_document'] = 'required|file|mimes:pdf,jpg,jpeg,png|max:5120';
         }
 
@@ -39,6 +41,7 @@ class AuthController extends Controller
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'phone' => $validated['phone'] ?? null,
+                'city' => $validated['city'],
                 'role' => 'authority',
                 'status' => 'pending', // Forced pending; Super Admin approval required
                 'department_id' => $validated['department_id'],
@@ -59,6 +62,7 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
+            'city' => $validated['city'] ?? null,
             'role' => 'citizen',
             'status' => 'active',
             'department_id' => null,

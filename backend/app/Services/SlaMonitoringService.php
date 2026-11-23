@@ -66,9 +66,12 @@ class SlaMonitoringService
             return;
         }
 
-        // Notify department authority staff
+        // Notify department authority staff within city jurisdiction
         $staffMembers = User::where('role', 'authority')
             ->where('department_id', $complaint->department_id)
+            ->when(!empty($complaint->city), function ($q) use ($complaint) {
+                $q->where('city', $complaint->city);
+            })
             ->get();
 
         foreach ($staffMembers as $staff) {
@@ -117,6 +120,9 @@ class SlaMonitoringService
 
         $staffMembers = User::where('role', 'authority')
             ->where('department_id', $complaint->department_id)
+            ->when(!empty($complaint->city), function ($q) use ($complaint) {
+                $q->where('city', $complaint->city);
+            })
             ->get();
 
         foreach ($staffMembers as $staff) {

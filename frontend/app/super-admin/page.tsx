@@ -17,6 +17,7 @@ import {
   Eye,
   FileText,
   Loader2,
+  MapPin,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -38,6 +39,7 @@ export default function SuperAdminPage() {
     staffId: number;
     staffName: string;
     employeeId: string;
+    city: string;
     departmentName: string;
     url: string;
     isPdf: boolean;
@@ -89,6 +91,7 @@ export default function SuperAdminPage() {
         staffId: staff.id,
         staffName: staff.name,
         employeeId: staff.employee_id || 'N/A',
+        city: staff.city || 'Karachi (Default)',
         departmentName: staff.department?.department_name || 'Municipal Department',
         url,
         isPdf,
@@ -207,6 +210,7 @@ export default function SuperAdminPage() {
               <thead className="bg-muted/40 text-muted-foreground border-b border-border">
                 <tr>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applicant Name</th>
+                  <th className="px-5 py-3 font-semibold uppercase tracking-wider">City Jurisdiction</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Department</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Employee / Badge ID</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applied Date</th>
@@ -220,6 +224,12 @@ export default function SuperAdminPage() {
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <div className="font-semibold text-foreground">{staff.name}</div>
                       <div className="text-[11px] text-muted-foreground">{staff.email}</div>
+                    </td>
+                    <td className="px-5 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                        <MapPin className="w-3 h-3 text-primary" />
+                        {staff.city || 'Karachi (Default)'}
+                      </span>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span className="font-medium text-primary">
@@ -297,7 +307,7 @@ export default function SuperAdminPage() {
                   Verification Document: {activeDocument.staffName}
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
-                  Badge ID: <span className="font-mono font-semibold">{activeDocument.employeeId}</span> &bull; {activeDocument.departmentName}
+                  Badge ID: <span className="font-mono font-semibold">{activeDocument.employeeId}</span> &bull; {activeDocument.departmentName} &bull; <span className="font-semibold text-primary">{activeDocument.city}</span>
                 </p>
               </div>
 

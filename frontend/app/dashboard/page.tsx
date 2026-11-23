@@ -29,6 +29,7 @@ import {
   FileText,
   IdCard,
   Loader2,
+  MapPin,
   PlusCircle,
   RefreshCw,
   ShieldAlert,
@@ -60,6 +61,7 @@ export default function DashboardPage() {
     staffId: number;
     staffName: string;
     employeeId: string;
+    city: string;
     departmentName: string;
     url: string;
     isPdf: boolean;
@@ -94,6 +96,7 @@ export default function DashboardPage() {
         } else if (user.role === 'authority') {
           const deptComplaints = await apiGetComplaints({
             department_id: user.department_id || undefined,
+            city: user.city || undefined,
             per_page: 50,
           });
           setComplaints(deptComplaints.data || []);
@@ -159,6 +162,7 @@ export default function DashboardPage() {
         staffId: staff.id,
         staffName: staff.name,
         employeeId: staff.employee_id || 'N/A',
+        city: staff.city || 'Karachi (Default)',
         departmentName: staff.department?.department_name || 'Municipal Department',
         url,
         isPdf,
@@ -287,7 +291,7 @@ export default function DashboardPage() {
             {user.role === 'citizen' &&
               'Track your submitted community reports, monitor resolution timelines, and view community upvotes.'}
             {user.role === 'authority' &&
-              `Assigned Department: ${user.department?.department_name || 'General Municipal Authority'} (SLA Target: ${user.department?.sla_hours || 48}h).`}
+              `Assigned Jurisdiction: ${user.department?.department_name || 'General Municipal Authority'} • ${user.city || 'Karachi'} (SLA Target: ${user.department?.sla_hours || 48}h).`}
             {user.role === 'admin' &&
               'System-wide municipal control room: Oversee department SLA compliance and platform routing.'}
           </p>
@@ -470,6 +474,7 @@ export default function DashboardPage() {
                 <thead className="bg-muted/40 text-muted-foreground border-b border-border">
                   <tr>
                     <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applicant Name</th>
+                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">City Jurisdiction</th>
                     <th className="px-5 py-3 font-semibold uppercase tracking-wider">Requested Department</th>
                     <th className="px-5 py-3 font-semibold uppercase tracking-wider">Employee / Badge ID</th>
                     <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applied Date</th>
@@ -483,6 +488,12 @@ export default function DashboardPage() {
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <div className="font-semibold text-foreground">{staff.name}</div>
                         <div className="text-[11px] text-muted-foreground">{staff.email}</div>
+                      </td>
+                      <td className="px-5 py-3.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                          <MapPin className="w-3 h-3 text-primary" />
+                          {staff.city || 'Karachi (Default)'}
+                        </span>
                       </td>
                       <td className="px-5 py-3.5 whitespace-nowrap">
                         <span className="font-medium text-primary">
@@ -600,7 +611,7 @@ export default function DashboardPage() {
                     <td className="px-5 py-3.5 max-w-xs">
                       <div className="font-semibold text-foreground truncate">{c.title}</div>
                       <div className="text-[11px] text-muted-foreground truncate">
-                        {c.category?.category_name} &bull; {c.address || 'Geo-Coordinates'}
+                        {c.category?.category_name} &bull; {c.city ? `${c.city} • ` : ''}{c.address || 'Geo-Coordinates'}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">
@@ -658,7 +669,7 @@ export default function DashboardPage() {
                   Verification Proof: {activeDocument.staffName}
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
-                  Badge ID: <span className="font-mono font-semibold">{activeDocument.employeeId}</span> &bull; {activeDocument.departmentName}
+                  Badge ID: <span className="font-mono font-semibold">{activeDocument.employeeId}</span> &bull; {activeDocument.departmentName} &bull; <span className="font-semibold text-primary">{activeDocument.city}</span>
                 </p>
               </div>
 

@@ -64,6 +64,7 @@ class FixMyCityApiTest extends TestCase
             'title' => 'Test Road Damage on Clifton Expressway',
             'description' => 'Massive ditch opened up in middle lane.',
             'category_id' => $category->id,
+            'city' => 'Karachi',
             'latitude' => 24.814,
             'longitude' => 67.032,
             'address' => 'Clifton Expressway, Karachi',
@@ -137,6 +138,7 @@ class FixMyCityApiTest extends TestCase
             'email' => 'bilal.officer@fixmycity.org',
             'password' => 'password123',
             'phone' => '+92 300 7778899',
+            'city' => 'Karachi',
             'role' => 'authority',
             'department_id' => $department->id,
             'employee_id' => 'EMP-ROADS-999',
@@ -145,12 +147,14 @@ class FixMyCityApiTest extends TestCase
 
         $response->assertStatus(201);
         $response->assertJsonPath('user.status', 'pending');
+        $response->assertJsonPath('user.city', 'Karachi');
         $response->assertJsonPath('token', null);
         $this->assertStringContainsString('pending Super Admin approval', $response->json('message'));
 
         $user = User::where('email', 'bilal.officer@fixmycity.org')->first();
         $this->assertNotNull($user);
         $this->assertEquals('pending', $user->status);
+        $this->assertEquals('Karachi', $user->city);
         $this->assertEquals('EMP-ROADS-999', $user->employee_id);
         $this->assertNotNull($user->verification_document_path);
 
@@ -315,5 +319,105 @@ class FixMyCityApiTest extends TestCase
             'Your staff registration request was rejected.',
             $staffLogin->json('message')
         );
+    }
+
+    public function test_authority_city_jurisdiction_scoping_and_cross_city_isolation(): void
+    {
+        // 1. Login as Karachi Roads Authority (roads@fixmycity.org)
+        $karachiLogin = $this->postJson('/api/auth/login', [
+            'email' => 'roads@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $karachiLogin->assertStatus(200);
+        $karachiToken = $karachiLogin->json('token');
+
+        // Fetch authority's complaint queue
+        $karachiQueue = $this->withHeader('Authorization', "Bearer {$karachiToken}")
+            ->getJson('/api/complaints');
+
+        $karachiQueue->assertStatus(200);
+        $karachiComplaints = $karachiQueue->json('data');
+
+        // Verify that all returned complaints belong to Karachi jurisdiction
+        $this->assertNotEmpty($karachiComplaints);
+        foreach ($karachiComplaints as $c) {
+            $this->assertEquals('Karachi', $c['city']);
+            $this->assertEquals($karachiLogin->json('user.department_id'), $c['department_id']);
+        }
+
+        // Verify that Lahore road complaints are NOT in Karachi's queue
+        $lahoreComplaint = Complaint::where('city', 'Lahore')->first();
+        $this->assertNotNull($lahoreComplaint);
+
+        $karachiComplaintIds = collect($karachiComplaints)->pluck('id')->all();
+        $this->assertNotContains($lahoreComplaint->id, $karachiComplaintIds);
+
+        // 2. Attempt to update Lahore complaint using Karachi authority token -> 403 Forbidden
+        $forbiddenUpdate = $this->withHeader('Authorization', "Bearer {$karachiToken}")
+            ->patchJson("/api/complaints/{$lahoreComplaint->id}/status", [
+                'status' => 'In Progress',
+                'notes' => 'Attempting unauthorized cross-city update.',
+            ]);
+
+        $forbiddenUpdate->assertStatus(403);
+        $this->assertStringContainsString('city jurisdiction', $forbiddenUpdate->json('message'));
+
+        // 3. Login as Lahore Roads Authority (roads.lahore@fixmycity.org)
+        app('auth')->forgetGuards();
+        $lahoreLogin = $this->postJson('/api/auth/login', [
+            'email' => 'roads.lahore@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $lahoreLogin->assertStatus(200);
+        $lahoreToken = $lahoreLogin->json('token');
+
+        // Fetch Lahore authority's complaint queue
+        app('auth')->forgetGuards();
+        $lahoreQueue = $this->withHeader('Authorization', "Bearer {$lahoreToken}")
+            ->getJson('/api/complaints');
+
+        $lahoreQueue->assertStatus(200);
+        $lahoreComplaints = $lahoreQueue->json('data');
+
+        // Verify Lahore sees Lahore complaints and no Karachi complaints
+        $this->assertNotEmpty($lahoreComplaints);
+        foreach ($lahoreComplaints as $c) {
+            $this->assertEquals('Lahore', $c['city']);
+            $this->assertEquals($lahoreLogin->json('user.department_id'), $c['department_id']);
+        }
+
+        // 4. Lahore authority CAN successfully update the Lahore complaint
+        $lahoreUpdate = $this->withHeader('Authorization', "Bearer {$lahoreToken}")
+            ->patchJson("/api/complaints/{$lahoreComplaint->id}/status", [
+                'status' => 'In Progress',
+                'notes' => 'Dispatched Lahore municipal team.',
+            ]);
+
+        $lahoreUpdate->assertStatus(200);
+        $this->assertEquals('In Progress', $lahoreUpdate->json('complaint.status'));
+    }
+
+    public function test_super_admin_and_public_can_filter_by_city(): void
+    {
+        // Public heatmap without filter returns all points
+        $allHeatmap = $this->getJson('/api/heatmap');
+        $allHeatmap->assertStatus(200);
+        $totalAll = $allHeatmap->json('total');
+
+        // Public heatmap with ?city=Karachi
+        $karachiHeatmap = $this->getJson('/api/heatmap?city=Karachi');
+        $karachiHeatmap->assertStatus(200);
+        $this->assertGreaterThan(0, $karachiHeatmap->json('total'));
+        foreach ($karachiHeatmap->json('points') as $point) {
+            $this->assertEquals('Karachi', $point['city']);
+        }
+
+        // Public heatmap with ?city=Lahore
+        $lahoreHeatmap = $this->getJson('/api/heatmap?city=Lahore');
+        $lahoreHeatmap->assertStatus(200);
+        $this->assertEquals(1, $lahoreHeatmap->json('total'));
+        $this->assertEquals('Lahore', $lahoreHeatmap->json('points.0.city'));
+
+        $this->assertEquals($totalAll, $karachiHeatmap->json('total') + $lahoreHeatmap->json('total'));
     }
 }

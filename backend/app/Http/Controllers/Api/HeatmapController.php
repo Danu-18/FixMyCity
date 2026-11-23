@@ -18,6 +18,7 @@ class HeatmapController extends Controller
                 'title',
                 'category_id',
                 'department_id',
+                'city',
                 'latitude',
                 'longitude',
                 'status',
@@ -34,8 +35,22 @@ class HeatmapController extends Controller
             }
         }
 
-        if ($departmentId = $request->query('department_id')) {
-            $query->where('department_id', $departmentId);
+        $currentUser = $request->user('sanctum');
+
+        // Authority jurisdiction scoping: strictly scoped to department AND city
+        if ($currentUser && $currentUser->isAuthority()) {
+            $query->where('department_id', $currentUser->department_id);
+            if (!empty($currentUser->city)) {
+                $query->where('city', $currentUser->city);
+            }
+        } else {
+            if ($departmentId = $request->query('department_id')) {
+                $query->where('department_id', $departmentId);
+            }
+
+            if ($city = $request->query('city')) {
+                $query->where('city', $city);
+            }
         }
 
         if ($categoryId = $request->query('category_id')) {
@@ -66,6 +81,7 @@ class HeatmapController extends Controller
                 'intensity' => round($intensity, 2),
                 'category' => $c->category ? $c->category->category_name : 'General',
                 'department' => $c->department ? $c->department->department_name : 'General',
+                'city' => $c->city,
                 'status' => $c->status,
                 'priority' => $c->priority,
                 'address' => $c->address,

@@ -26,6 +26,19 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { PAKISTAN_CITIES } from '@/lib/constants';
+
+function matchSupportedCity(rawCity?: string): string {
+  if (!rawCity) return 'Karachi';
+  const clean = rawCity.trim().toLowerCase();
+  for (const c of PAKISTAN_CITIES) {
+    if (c === 'Other') continue;
+    if (clean.includes(c.toLowerCase())) {
+      return c;
+    }
+  }
+  return 'Other';
+}
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
@@ -47,6 +60,7 @@ export default function ReportComplaintPage() {
   const [categoryId, setCategoryId] = useState<string>('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<string>('Medium');
+  const [city, setCity] = useState<string>('Karachi');
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number>(24.8607);
   const [lng, setLng] = useState<number>(67.0011);
@@ -129,8 +143,13 @@ export default function ReportComplaintPage() {
     setIsReverseGeocoding(true);
     try {
       const result = await reverseGeocodeNominatim(selectedLat, selectedLng);
-      if (reqId === lastGeocodeReqId.current && result && (result.formattedAddress || result.displayName)) {
-        setAddress(result.formattedAddress || result.displayName);
+      if (reqId === lastGeocodeReqId.current && result) {
+        if (result.formattedAddress || result.displayName) {
+          setAddress(result.formattedAddress || result.displayName);
+        }
+        if (result.city) {
+          setCity(matchSupportedCity(result.city));
+        }
       }
     } catch (err) {
       console.error('Reverse geocode error:', err);
@@ -183,6 +202,9 @@ export default function ReportComplaintPage() {
     setAddress(item.formattedAddress || item.displayName);
     setLat(item.lat);
     setLng(item.lng);
+    if (item.city) {
+      setCity(matchSupportedCity(item.city));
+    }
     setIsDropdownOpen(false);
     setSearchResults([]);
     toast.success(`Selected: ${item.formattedAddress || item.displayName}`);
@@ -203,6 +225,9 @@ export default function ReportComplaintPage() {
         setLng(result.lng);
         if (result.formattedAddress) {
           setAddress(result.formattedAddress);
+        }
+        if (result.city) {
+          setCity(matchSupportedCity(result.city));
         }
         setIsDropdownOpen(false);
         setSearchResults([]);
@@ -242,8 +267,13 @@ export default function ReportComplaintPage() {
         setIsReverseGeocoding(true);
         try {
           const result = await reverseGeocodeNominatim(latitude, longitude);
-          if (reqId === lastGeocodeReqId.current && result && (result.formattedAddress || result.displayName)) {
-            setAddress(result.formattedAddress || result.displayName);
+          if (reqId === lastGeocodeReqId.current && result) {
+            if (result.formattedAddress || result.displayName) {
+              setAddress(result.formattedAddress || result.displayName);
+            }
+            if (result.city) {
+              setCity(matchSupportedCity(result.city));
+            }
             toast.success(`Current location: ${result.formattedAddress || result.displayName}`);
           } else {
             toast.success(`GPS coordinates detected: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
@@ -280,6 +310,10 @@ export default function ReportComplaintPage() {
       toast.warn('Please select a complaint category.');
       return;
     }
+    if (!city.trim()) {
+      toast.warn('Please select or specify the municipal city for this complaint.');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -289,6 +323,7 @@ export default function ReportComplaintPage() {
       formData.append('description', description.trim());
       formData.append('category_id', categoryId);
       formData.append('priority', priority);
+      formData.append('city', city.trim());
       formData.append('latitude', String(lat));
       formData.append('longitude', String(lng));
       if (address.trim()) {
@@ -650,6 +685,31 @@ export default function ReportComplaintPage() {
             <p className="text-[11px] text-muted-foreground mt-1.5">
               Live autocomplete enabled for Pakistan. Pick from suggestions or drag the pin.
             </p>
+
+            {/* City Jurisdiction Field */}
+            <div className="mt-3 p-3.5 bg-muted/40 border border-border rounded-xl">
+              <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-primary" />
+                  Municipal City Jurisdiction *
+                </span>
+                <span className="text-[11px] text-muted-foreground font-normal">
+                  Auto-fills from location pin or search
+                </span>
+              </label>
+              <select
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                required
+                className="w-full text-xs bg-background border border-input rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none font-medium"
+              >
+                {PAKISTAN_CITIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

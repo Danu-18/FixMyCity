@@ -8,6 +8,23 @@ export interface GeocodeResult {
   lng: number;
   displayName: string;
   formattedAddress: string;
+  city?: string;
+}
+
+/**
+ * Extracts city name from Nominatim response (address.city || address.town || address.state_district).
+ */
+export function extractCityFromNominatim(data: any): string | undefined {
+  if (!data) return undefined;
+  const addr = data.address || {};
+  const rawCity =
+    addr.city ||
+    addr.town ||
+    addr.state_district ||
+    addr.municipality ||
+    addr.county;
+  if (!rawCity) return undefined;
+  return String(rawCity).trim();
 }
 
 /**
@@ -127,6 +144,7 @@ export async function searchAddressNominatim(query: string): Promise<GeocodeResu
     lng,
     displayName: first.display_name || '',
     formattedAddress: formatNominatimAddress(first),
+    city: extractCityFromNominatim(first),
   };
 }
 
@@ -161,7 +179,7 @@ export async function searchAddressesNominatim(
   }
 
   return data
-    .map((item: any) => {
+    .map((item: any): GeocodeResult | null => {
       const lat = parseFloat(item.lat);
       const lng = parseFloat(item.lon);
 
@@ -174,6 +192,7 @@ export async function searchAddressesNominatim(
         lng,
         displayName: item.display_name || '',
         formattedAddress: formatNominatimAddress(item),
+        city: extractCityFromNominatim(item),
       };
     })
     .filter((item): item is GeocodeResult => item !== null);
@@ -209,5 +228,6 @@ export async function reverseGeocodeNominatim(lat: number, lng: number): Promise
     lng: parseFloat(data.lon || String(lng)),
     displayName: data.display_name || '',
     formattedAddress: formatNominatimAddress(data),
+    city: extractCityFromNominatim(data),
   };
 }
