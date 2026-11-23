@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   PlusCircle,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { NotificationModal } from './NotificationModal';
@@ -141,6 +142,16 @@ export function Navbar() {
                       Dashboard Portal
                     </Link>
 
+                    {user.role === 'super_admin' && (
+                      <Link
+                        href="/super-admin"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 transition-colors font-medium"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Staff Verification Console
+                      </Link>
+                    )}
+
                     <button
                       onClick={() => logout()}
                       className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors text-left"
@@ -231,6 +242,15 @@ export function Navbar() {
                 >
                   Dashboard ({user.name})
                 </Link>
+                {user.role === 'super_admin' && (
+                  <Link
+                    href="/super-admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-amber-700 dark:text-amber-400 font-semibold text-xs"
+                  >
+                    🛡️ Super Admin Console
+                  </Link>
+                )}
                 <button
                   onClick={() => {
                     logout();

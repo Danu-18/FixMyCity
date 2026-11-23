@@ -64,17 +64,22 @@ export async function apiLogin(email: string, password: string): Promise<{ token
   });
 }
 
-export async function apiRegister(userData: {
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
-  role?: string;
-  department_id?: number | null;
-}): Promise<{ token: string; user: User }> {
+export async function apiRegister(
+  userData:
+    | FormData
+    | {
+        name: string;
+        email: string;
+        password: string;
+        phone?: string;
+        role?: string;
+        department_id?: number | null;
+        employee_id?: string;
+      }
+): Promise<{ message?: string; token?: string | null; user: User }> {
   return apiFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify(userData),
+    body: userData instanceof FormData ? userData : JSON.stringify(userData),
   });
 }
 
@@ -174,4 +179,33 @@ export async function apiMarkAllNotificationsRead(): Promise<void> {
 // Admin SLA check
 export async function apiTriggerSlaCheck(): Promise<any> {
   return apiFetch('/sla/trigger-check', { method: 'POST' });
+}
+
+// Super Admin Staff Verification API
+export async function apiGetPendingStaff(): Promise<User[]> {
+  return apiFetch('/super-admin/pending-staff');
+}
+
+export async function apiDownloadStaffDocument(id: number): Promise<Blob> {
+  const token = getAuthToken();
+  const url = `${API_BASE_URL}/super-admin/staff/${id}/document`;
+  const res = await fetch(url, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: '*/*',
+    },
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => null);
+    throw new Error(errorData?.message || `Failed to download document (${res.status})`);
+  }
+  return res.blob();
+}
+
+export async function apiApproveStaff(id: number): Promise<{ message: string; user: User }> {
+  return apiFetch(`/super-admin/staff/${id}/approve`, { method: 'POST' });
+}
+
+export async function apiRejectStaff(id: number): Promise<{ message: string; user: User }> {
+  return apiFetch(`/super-admin/staff/${id}/reject`, { method: 'POST' });
 }

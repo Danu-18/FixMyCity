@@ -1,13 +1,20 @@
-export type UserRole = 'citizen' | 'authority' | 'admin';
+export type UserRole = 'citizen' | 'authority' | 'admin' | 'super_admin';
+export type UserStatus = 'active' | 'pending' | 'rejected';
 
 export interface User {
   id: number;
   name: string;
   email: string;
   role: UserRole;
+  status?: UserStatus;
   phone?: string | null;
   department_id?: number | null;
   department?: Department | null;
+  employee_id?: string | null;
+  verification_document_path?: string | null;
+  approved_by?: number | null;
+  approved_at?: string | null;
+  approver?: User | null;
   created_at?: string;
 }
 

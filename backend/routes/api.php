@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ComplaintController;
 use App\Http\Controllers\Api\DepartmentController;
 use App\Http\Controllers\Api\HeatmapController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\SuperAdminController;
 use App\Services\SlaMonitoringService;
 use Illuminate\Support\Facades\Route;
 
@@ -15,9 +16,12 @@ use Illuminate\Support\Facades\Route;
 | Public Routes
 |--------------------------------------------------------------------------
 */
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
+
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
 });
 
 Route::get('/departments', [DepartmentController::class, 'index']);
@@ -49,6 +53,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications', [NotificationController::class, 'index']);
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // Super Admin Workflow
+    Route::middleware('role:super_admin')->prefix('super-admin')->group(function () {
+        Route::get('/pending-staff', [SuperAdminController::class, 'pendingStaff']);
+        Route::get('/staff/{id}/document', [SuperAdminController::class, 'viewDocument']);
+        Route::post('/staff/{id}/approve', [SuperAdminController::class, 'approveStaff']);
+        Route::post('/staff/{id}/reject', [SuperAdminController::class, 'rejectStaff']);
+    });
 
     // Authority & Admin Workflow
     Route::middleware('role:authority,admin')->group(function () {

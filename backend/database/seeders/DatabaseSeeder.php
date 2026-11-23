@@ -229,12 +229,23 @@ class DatabaseSeeder extends Seeder
         // 3. Seed Users (RBAC)
         $hashedPassword = Hash::make('password123');
 
+        // Super Admin
+        $superAdminUser = User::create([
+            'name' => 'Super Administrator',
+            'email' => 'superadmin@fixmycity.org',
+            'password' => $hashedPassword,
+            'role' => 'super_admin',
+            'status' => 'active',
+            'phone' => '+92 300 9999999',
+        ]);
+
         // Citizens
         $citizenDanial = User::create([
             'name' => 'Danial Arif',
             'email' => 'citizen@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'citizen',
+            'status' => 'active',
             'phone' => '+92 370 3130213',
         ]);
 
@@ -243,6 +254,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'citizen2@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'citizen',
+            'status' => 'active',
             'phone' => '+92 300 1234567',
         ]);
 
@@ -252,7 +264,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'roads@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
+            'status' => 'active',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
+            'employee_id' => 'EMP-ROADS-101',
             'phone' => '+92 321 9876543',
         ]);
 
@@ -261,7 +275,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'water@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
+            'status' => 'active',
             'department_id' => $deptMap['Water & Sanitation']->id,
+            'employee_id' => 'EMP-WATER-202',
             'phone' => '+92 333 4567890',
         ]);
 
@@ -270,7 +286,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'power@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
+            'status' => 'active',
             'department_id' => $deptMap['Electricity & Power Utilities']->id,
+            'employee_id' => 'EMP-POWER-303',
             'phone' => '+92 312 3456789',
         ]);
 
@@ -279,7 +297,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'waste@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
+            'status' => 'active',
             'department_id' => $deptMap['Municipal Waste Management']->id,
+            'employee_id' => 'EMP-WASTE-404',
             'phone' => '+92 345 6789012',
         ]);
 
@@ -288,7 +308,9 @@ class DatabaseSeeder extends Seeder
             'email' => 'safety@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'authority',
+            'status' => 'active',
             'department_id' => $deptMap['Public Safety & Security']->id,
+            'employee_id' => 'EMP-SAFETY-505',
             'phone' => '+92 301 2345678',
         ]);
 
@@ -298,6 +320,7 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@fixmycity.org',
             'password' => $hashedPassword,
             'role' => 'admin',
+            'status' => 'active',
             'department_id' => $deptMap['Central Administration / IT']->id,
             'phone' => '+92 300 0000000',
         ]);

@@ -24,7 +24,30 @@ class RoleMiddleware
             ], 401);
         }
 
+        if ($user->status === 'pending') {
+            return response()->json([
+                'message' => 'Your municipal staff account is pending Super Admin approval.',
+            ], 403);
+        }
+
+        if ($user->status === 'rejected') {
+            return response()->json([
+                'message' => 'Your staff registration request was rejected.',
+            ], 403);
+        }
+
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => 'Unauthorized: Account is not active.',
+            ], 403);
+        }
+
         if (empty($roles) || in_array($user->role, $roles, true)) {
+            return $next($request);
+        }
+
+        // Super Admin has access to admin and authority routes
+        if ($user->role === 'super_admin' && (in_array('admin', $roles, true) || in_array('authority', $roles, true))) {
             return $next($request);
         }
 

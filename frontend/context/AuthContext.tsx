@@ -72,10 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: any): Promise<User> => {
     const res = await apiRegister(userData);
-    localStorage.setItem('fmc_auth_token', res.token);
-    setToken(res.token);
-    setUser(res.user);
-    refreshNotifications();
+    if (res.token) {
+      localStorage.setItem('fmc_auth_token', res.token);
+      setToken(res.token);
+      setUser(res.user);
+      refreshNotifications();
+    }
     return res.user;
   };
 

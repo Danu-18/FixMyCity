@@ -3,7 +3,17 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Building2, Loader2, Lock, Mail } from 'lucide-react';
+import {
+  AlertTriangle,
+  Building2,
+  Clock,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldAlert,
+  ShieldCheck,
+  XCircle,
+} from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
 
@@ -14,10 +24,15 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<{
+    type: 'pending' | 'rejected' | 'generic';
+    message: string;
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setAuthError(null);
 
     try {
       await login(email.trim(), password);
@@ -25,6 +40,56 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err.message || 'Invalid email or password.';
+      if (msg.toLowerCase().includes('pending') || err.status === 403 && msg.includes('pending')) {
+        setAuthError({
+          type: 'pending',
+          message: 'Your municipal staff account is pending Super Admin approval. Please wait for administrative verification.',
+        });
+      } else if (msg.toLowerCase().includes('rejected') || err.status === 403 && msg.includes('rejected')) {
+        setAuthError({
+          type: 'rejected',
+          message: 'Your staff registration request was rejected by the Super Admin.',
+        });
+      } else {
+        setAuthError({
+          type: 'generic',
+          message: msg,
+        });
+      }
+      toast.error(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async (demoEmail: string, demoPassword = 'password123') => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setAuthError(null);
+    setIsLoading(true);
+
+    try {
+      await login(demoEmail, demoPassword);
+      toast.success(`Signed in as ${demoEmail}`);
+      router.push('/dashboard');
+    } catch (err: any) {
+      const msg = err.message || 'Failed to sign in with demo credentials.';
+      if (msg.includes('pending')) {
+        setAuthError({
+          type: 'pending',
+          message: 'Your municipal staff account is pending Super Admin approval.',
+        });
+      } else if (msg.includes('rejected')) {
+        setAuthError({
+          type: 'rejected',
+          message: 'Your staff registration request was rejected.',
+        });
+      } else {
+        setAuthError({
+          type: 'generic',
+          message: msg,
+        });
+      }
       toast.error(msg);
     } finally {
       setIsLoading(false);
@@ -46,6 +111,37 @@ export default function LoginPage() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
+        {/* Error Banners */}
+        {authError && (
+          <div
+            className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all ${
+              authError.type === 'pending'
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
+                : authError.type === 'rejected'
+                ? 'bg-destructive/10 border-destructive/30 text-destructive'
+                : 'bg-destructive/10 border-destructive/30 text-destructive'
+            }`}
+          >
+            {authError.type === 'pending' ? (
+              <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            ) : authError.type === 'rejected' ? (
+              <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1">
+              <span className="font-bold block">
+                {authError.type === 'pending'
+                  ? 'Registration Pending Approval'
+                  : authError.type === 'rejected'
+                  ? 'Application Rejected'
+                  : 'Authentication Error'}
+              </span>
+              <span className="mt-0.5 block leading-relaxed">{authError.message}</span>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-foreground mb-1">
@@ -57,7 +153,10 @@ export default function LoginPage() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (authError) setAuthError(null);
+                }}
                 placeholder="name@fixmycity.org"
                 className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
@@ -74,7 +173,10 @@ export default function LoginPage() {
                 type="password"
                 required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (authError) setAuthError(null);
+                }}
                 placeholder="••••••••"
                 className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
               />
@@ -90,35 +192,22 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Demo Fast Login Switcher */}
-        {/* <div className="pt-4 border-t border-border">
+        {/* 1-Click Demo Accounts Switcher */}
+        <div className="pt-4 border-t border-border">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-            One-Click Demo Evaluator Accounts:
+            1-Click Demo Accounts:
           </p>
           <div className="space-y-1.5">
             <button
               type="button"
-              onClick={() => handleQuickLogin('citizen@fixmycity.org')}
-              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
+              onClick={() => handleQuickLogin('superadmin@fixmycity.org')}
+              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 flex items-center justify-between transition-colors text-primary font-medium"
             >
-              <span>👤 <b>Citizen:</b> Danial Arif</span>
-              <span className="text-[10px] font-semibold text-primary">Autofill</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('roads@fixmycity.org')}
-              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
-            >
-              <span>🛣️ <b>Authority:</b> Roads Department</span>
-              <span className="text-[10px] font-semibold text-primary">Autofill</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickLogin('water@fixmycity.org')}
-              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
-            >
-              <span>🚰 <b>Authority:</b> Water & Sanitation</span>
-              <span className="text-[10px] font-semibold text-primary">Autofill</span>
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <b>Super Admin:</b> Approver
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">Demo Login</span>
             </button>
             <button
               type="button"
@@ -126,15 +215,31 @@ export default function LoginPage() {
               className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
             >
               <span>👑 <b>Administrator:</b> City Hall DG</span>
-              <span className="text-[10px] font-semibold text-primary">Autofill</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Demo Login</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('roads@fixmycity.org')}
+              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
+            >
+              <span>🛣️ <b>Authority:</b> Roads Department</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Demo Login</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickLogin('citizen@fixmycity.org')}
+              className="w-full text-left px-3 py-2 text-xs rounded-lg bg-background hover:bg-accent border border-border flex items-center justify-between transition-colors"
+            >
+              <span>👤 <b>Citizen:</b> Danial Arif</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Demo Login</span>
             </button>
           </div>
-        </div> */}
+        </div>
 
         <p className="text-center text-xs text-muted-foreground">
           Don&apos;t have an account?{' '}
           <Link href="/register" className="text-primary font-semibold hover:underline">
-            Register as a Citizen
+            Register Account
           </Link>
         </p>
       </div>

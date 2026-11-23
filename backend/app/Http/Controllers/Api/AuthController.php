@@ -13,32 +13,62 @@ class AuthController extends Controller
 {
     public function register(Request $request): JsonResponse
     {
-        $validated = $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'phone' => 'nullable|string|max:30',
-            'role' => 'nullable|string|in:citizen,authority,admin',
-            'department_id' => 'nullable|exists:departments,id',
-        ]);
+            'role' => 'nullable|string|in:citizen,authority', // Explicitly block super_admin and admin
+        ];
 
-        $role = $validated['role'] ?? 'citizen';
-        $departmentId = ($role === 'authority') ? ($validated['department_id'] ?? null) : null;
+        $role = $request->input('role', 'citizen');
 
+        if ($role === 'authority') {
+            $rules['department_id'] = 'required|exists:departments,id';
+            $rules['employee_id'] = 'required|string|max:100';
+            $rules['verification_document'] = 'required|file|mimes:pdf,jpg,jpeg,png|max:5120';
+        }
+
+        $validated = $request->validate($rules);
+
+        if ($role === 'authority') {
+            $path = $request->file('verification_document')->store('verifications', 'local');
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'phone' => $validated['phone'] ?? null,
+                'role' => 'authority',
+                'status' => 'pending', // Forced pending; Super Admin approval required
+                'department_id' => $validated['department_id'],
+                'employee_id' => $validated['employee_id'],
+                'verification_document_path' => $path,
+            ]);
+
+            return response()->json([
+                'message' => 'Your municipal staff account registration has been submitted and is pending Super Admin approval.',
+                'user' => $user->load('department'),
+                'token' => null,
+            ], 201);
+        }
+
+        // Citizen registration
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
-            'role' => $role,
-            'department_id' => $departmentId,
+            'role' => 'citizen',
+            'status' => 'active',
+            'department_id' => null,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'message' => 'User registered successfully',
-            'user' => $user->load('department'),
+            'user' => $user,
             'token' => $token,
         ], 201);
     }
@@ -58,6 +88,25 @@ class AuthController extends Controller
             ]);
         }
 
+        // Enforce account status check
+        if ($user->status === 'pending') {
+            return response()->json([
+                'message' => 'Your municipal staff account is pending Super Admin approval.',
+            ], 403);
+        }
+
+        if ($user->status === 'rejected') {
+            return response()->json([
+                'message' => 'Your staff registration request was rejected.',
+            ], 403);
+        }
+
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => 'Your account is not active.',
+            ], 403);
+        }
+
         // Revoke old tokens if any (clean session)
         $user->tokens()->delete();
 
@@ -73,7 +122,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'user' => $request->user()->load('department'),
+            'user' => $request->user()->load(['department', 'approver']),
         ]);
     }
 
