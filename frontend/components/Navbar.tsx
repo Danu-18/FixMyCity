@@ -298,7 +298,8 @@ export function Navbar() {
 
       {/* Notifications Drawer */}
       <NotificationModal
-        isOpen={notificationsOpen}
+        key={user?.id || 'guest'}
+        isOpen={notificationsOpen && !!user}
         onClose={() => setNotificationsOpen(false)}
       />
     </>

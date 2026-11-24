@@ -2,19 +2,21 @@
 
 namespace App\Services;
 
-use App\Mail\ComplaintStatusUpdatedMail;
 use App\Models\Category;
 use App\Models\Complaint;
-use App\Models\Notification;
 use App\Models\StatusHistory;
 use App\Models\User;
 use Carbon\Carbon;
 use Exception;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class ComplaintRoutingEngine
 {
+    protected ComplaintNotificationService $notificationService;
+
+    public function __construct(?ComplaintNotificationService $notificationService = null)
+    {
+        $this->notificationService = $notificationService ?? app(ComplaintNotificationService::class);
+    }
     /**
      * Permitted state transitions in the FixMyCity State Machine.
      */
@@ -125,56 +127,9 @@ class ComplaintRoutingEngine
             'changed_at' => Carbon::now(),
         ]);
 
-        // Trigger notifications
-        $this->notifyStatusChange($complaint, $oldStatus, $newStatus, $notes);
+        // Trigger centralized notifications
+        $this->notificationService->notifyComplaintStatusUpdated($complaint, $newStatus, $notes);
 
         return $complaint->fresh(['statusHistory.changer', 'department', 'category', 'user']);
-    }
-
-    /**
-     * Dispatches notifications to the citizen and authorities.
-     */
-    protected function notifyStatusChange(Complaint $complaint, string $oldStatus, string $newStatus, ?string $notes = null): void
-    {
-        // 1. Notify reporting citizen if registered
-        if ($complaint->user_id) {
-            Notification::create([
-                'user_id' => $complaint->user_id,
-                'complaint_id' => $complaint->id,
-                'title' => "Complaint #{$complaint->tracking_number} Status Updated",
-                'message' => "Your complaint '{$complaint->title}' has been moved to '{$newStatus}'. " . ($notes ? "Notes: {$notes}" : ""),
-                'type' => 'status_change',
-            ]);
-
-            // Dispatch status email to citizen
-            try {
-                $complaint->loadMissing(['user', 'department', 'category']);
-                if ($complaint->user && !empty($complaint->user->email)) {
-                    Mail::to($complaint->user->email)->send(
-                        new ComplaintStatusUpdatedMail($complaint, $oldStatus, $newStatus, $notes)
-                    );
-                }
-            } catch (\Throwable $e) {
-                Log::warning("Complaint status email could not be sent: " . $e->getMessage());
-            }
-        }
-
-        // 2. Notify departmental staff in the same jurisdiction (department and city)
-        $staffMembers = User::where('role', 'authority')
-            ->where('department_id', $complaint->department_id)
-            ->when(!empty($complaint->city), function ($q) use ($complaint) {
-                $q->where('city', $complaint->city);
-            })
-            ->get();
-
-        foreach ($staffMembers as $staff) {
-            Notification::create([
-                'user_id' => $staff->id,
-                'complaint_id' => $complaint->id,
-                'title' => "Complaint #{$complaint->tracking_number} Updated to {$newStatus}",
-                'message' => "Complaint '{$complaint->title}' status updated to '{$newStatus}'.",
-                'type' => 'status_change',
-            ]);
-        }
     }
 }

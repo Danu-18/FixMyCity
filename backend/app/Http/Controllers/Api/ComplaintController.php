@@ -6,14 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use App\Models\StatusHistory;
 use App\Models\Upvote;
-use App\Mail\ComplaintSubmittedMail;
+use App\Services\ComplaintNotificationService;
 use App\Services\ComplaintRoutingEngine;
 use App\Services\ContentModerationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -21,7 +20,8 @@ class ComplaintController extends Controller
 {
     public function __construct(
         protected ComplaintRoutingEngine $routingEngine,
-        protected ContentModerationService $moderationService
+        protected ContentModerationService $moderationService,
+        protected ComplaintNotificationService $notificationService
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -268,17 +268,10 @@ class ComplaintController extends Controller
                 'complaint_id' => $complaint->id,
                 'user_id' => $user->id,
             ]);
-
-            // Dispatch confirmation email to citizen
-            if (!empty($user->email)) {
-                try {
-                    $complaint->loadMissing(['department', 'category']);
-                    Mail::to($user->email)->send(new ComplaintSubmittedMail($complaint));
-                } catch (\Throwable $e) {
-                    Log::warning("Complaint confirmation email could not be sent: " . $e->getMessage());
-                }
-            }
         }
+
+        // Centralized citizen + Super Admin moderation notification & email dispatch
+        $this->notificationService->notifyComplaintSubmitted($complaint);
 
         return response()->json([
             'message' => 'Complaint submitted successfully and is awaiting moderation review before public listing.',

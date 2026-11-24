@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Mail\CitizenVerificationCodeMail;
+use App\Mail\ComplaintLifecycleMail;
 use App\Models\Category;
 use App\Models\Complaint;
 use App\Models\Department;
+use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -939,5 +941,284 @@ class FixMyCityApiTest extends TestCase
         Mail::assertSent(CitizenVerificationCodeMail::class, function ($mail) {
             return $mail->hasTo('resendotp@example.com');
         });
+    }
+
+    public function test_filing_complaint_notifies_citizen_a_and_super_admin_while_citizen_b_gets_zero_notifications(): void
+    {
+        $citizenA = User::create([
+            'name' => 'Citizen Alpha',
+            'email' => 'citizen.alpha@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'city' => 'Karachi',
+            'email_verified_at' => now(),
+        ]);
+
+        $citizenB = User::create([
+            'name' => 'Citizen Beta',
+            'email' => 'citizen.beta@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'city' => 'Lahore',
+            'email_verified_at' => now(),
+        ]);
+
+        $category = Category::first();
+        $this->assertNotNull($category);
+
+        $tokenA = $citizenA->createToken('test')->plainTextToken;
+        $response = $this->withHeader('Authorization', "Bearer {$tokenA}")
+            ->post('/api/complaints', [
+                'title' => 'Severe Water Pipe Burst on Main Road',
+                'description' => 'A large main pipe has ruptured causing severe flooding on the roadway.',
+                'category_id' => $category->id,
+                'city' => 'Karachi',
+                'latitude' => 24.88,
+                'longitude' => 67.08,
+                'image' => $this->createFakeImage('rupture.png'),
+            ]);
+
+        $response->assertStatus(201);
+        $complaintId = $response->json('complaint.id');
+        $this->assertNotNull($complaintId);
+
+        // Assert ComplaintLifecycleMail sent to Citizen A
+        Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizenA) {
+            return $mail->hasTo($citizenA->email) && $mail->stage === 'submitted';
+        });
+
+        // Assert DB notification created for Citizen A
+        $notifA = Notification::where('user_id', $citizenA->id)->where('complaint_id', $complaintId)->first();
+        $this->assertNotNull($notifA);
+        $this->assertEquals('complaint_submitted', $notifA->type);
+
+        // Assert Super Admin received a moderation review notification
+        $superAdmin = User::where('role', 'super_admin')->first();
+        $this->assertTrue(Notification::where('user_id', $superAdmin->id)->where('complaint_id', $complaintId)->exists());
+
+        // Assert Citizen B receives ZERO notifications for Citizen A's complaint
+        app('auth')->forgetGuards();
+        $tokenB = $citizenB->createToken('test')->plainTextToken;
+        $notifsResponseB = $this->withHeader('Authorization', "Bearer {$tokenB}")->getJson('/api/notifications');
+        $notifsResponseB->assertStatus(200);
+        $complaintIdsB = collect($notifsResponseB->json('notifications.data'))->pluck('complaint_id')->toArray();
+        $this->assertNotContains($complaintId, $complaintIdsB);
+    }
+
+    public function test_citizen_b_cannot_mark_citizen_a_notification_as_read_with_403_forbidden(): void
+    {
+        $citizenA = User::create([
+            'name' => 'Owner Citizen',
+            'email' => 'owner@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        $citizenB = User::create([
+            'name' => 'Attacker Citizen',
+            'email' => 'attacker@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        $notifA = Notification::create([
+            'user_id' => $citizenA->id,
+            'title' => 'Your Private Notification',
+            'message' => 'Confidential details about your complaint.',
+            'type' => 'status_change',
+            'is_read' => false,
+        ]);
+
+        $tokenA = $citizenA->createToken('test')->plainTextToken;
+        $tokenB = $citizenB->createToken('test')->plainTextToken;
+
+        // Citizen B attempts to mark Citizen A's notification as read -> 403 Forbidden
+        app('auth')->forgetGuards();
+        $responseB = $this->withHeader('Authorization', "Bearer {$tokenB}")
+            ->patchJson("/api/notifications/{$notifA->id}/read");
+
+        $responseB->assertStatus(403);
+        $this->assertFalse($notifA->fresh()->is_read);
+
+        // Citizen A marks their own notification as read -> 200 OK
+        app('auth')->forgetGuards();
+        $responseA = $this->withHeader('Authorization', "Bearer {$tokenA}")
+            ->patchJson("/api/notifications/{$notifA->id}/read");
+
+        $responseA->assertStatus(200);
+        $this->assertTrue($notifA->fresh()->is_read);
+    }
+
+    public function test_super_admin_approval_sends_email_to_citizen_and_notifies_matching_authority_only(): void
+    {
+        $citizen = User::create([
+            'name' => 'Approvee Citizen',
+            'email' => 'approvee@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'city' => 'Karachi',
+            'email_verified_at' => now(),
+        ]);
+
+        $category = Category::first();
+        $complaint = Complaint::create([
+            'tracking_number' => 'FMC-2026-APPRV',
+            'user_id' => $citizen->id,
+            'category_id' => $category->id,
+            'department_id' => $category->department_id,
+            'city' => 'Karachi',
+            'latitude' => 24.87,
+            'longitude' => 67.06,
+            'title' => 'Large Sinkhole on Sunset Boulevard',
+            'description' => 'A very deep sinkhole opened after rain near the intersection.',
+            'status' => 'Pending',
+            'priority' => 'High',
+            'moderation_status' => 'pending_review',
+        ]);
+
+        $superAdmin = User::where('role', 'super_admin')->first();
+        $superToken = $superAdmin->createToken('test')->plainTextToken;
+
+        app('auth')->forgetGuards();
+        $response = $this->withHeader('Authorization', "Bearer {$superToken}")
+            ->postJson("/api/super-admin/complaints/{$complaint->id}/approve");
+
+        $response->assertStatus(200);
+
+        // Assert ComplaintLifecycleMail sent to citizen
+        Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen) {
+            return $mail->hasTo($citizen->email) && $mail->stage === 'approved';
+        });
+
+        // Assert citizen received DB notification
+        $this->assertTrue(Notification::where('user_id', $citizen->id)->where('complaint_id', $complaint->id)->where('type', 'moderation_approved')->exists());
+
+        // Assert matching Karachi department officer received notification
+        $karachiOfficer = User::where('role', 'authority')
+            ->where('department_id', $complaint->department_id)
+            ->where('city', 'Karachi')
+            ->first();
+
+        if ($karachiOfficer) {
+            $this->assertTrue(Notification::where('user_id', $karachiOfficer->id)->where('complaint_id', $complaint->id)->where('type', 'complaint_assigned')->exists());
+        }
+
+        // Assert officers from other cities (e.g. Lahore) did not receive this notification
+        $lahoreOfficers = User::where('role', 'authority')
+            ->where('city', 'Lahore')
+            ->pluck('id');
+
+        $this->assertFalse(Notification::whereIn('user_id', $lahoreOfficers)->where('complaint_id', $complaint->id)->exists());
+    }
+
+    public function test_super_admin_rejection_sends_lifecycle_mail_with_reason_and_db_notification_to_citizen(): void
+    {
+        $citizen = User::create([
+            'name' => 'Rejected Citizen',
+            'email' => 'rejected.citizen@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'city' => 'Islamabad',
+            'email_verified_at' => now(),
+        ]);
+
+        $category = Category::first();
+        $complaint = Complaint::create([
+            'tracking_number' => 'FMC-2026-REJCT',
+            'user_id' => $citizen->id,
+            'category_id' => $category->id,
+            'department_id' => $category->department_id,
+            'city' => 'Islamabad',
+            'latitude' => 33.72,
+            'longitude' => 73.04,
+            'title' => 'Unclear Non-Civic Private Dispute',
+            'description' => 'Dispute with neighbor regarding property boundary line wall.',
+            'status' => 'Pending',
+            'priority' => 'Low',
+            'moderation_status' => 'pending_review',
+        ]);
+
+        $superAdmin = User::where('role', 'super_admin')->first();
+        $superToken = $superAdmin->createToken('test')->plainTextToken;
+
+        $rejectionReason = 'FixMyCity only handles public municipal infrastructure issues, not private property disputes.';
+        app('auth')->forgetGuards();
+        $response = $this->withHeader('Authorization', "Bearer {$superToken}")
+            ->postJson("/api/super-admin/complaints/{$complaint->id}/reject", [
+                'reason' => $rejectionReason,
+            ]);
+
+        $response->assertStatus(200);
+
+        // Assert ComplaintLifecycleMail sent with reason
+        Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen, $rejectionReason) {
+            return $mail->hasTo($citizen->email) && $mail->stage === 'rejected' && $mail->remarks === $rejectionReason;
+        });
+
+        // Assert citizen received DB notification
+        $notif = Notification::where('user_id', $citizen->id)->where('complaint_id', $complaint->id)->where('type', 'moderation_rejected')->first();
+        $this->assertNotNull($notif);
+        $this->assertStringContainsString($rejectionReason, $notif->message);
+    }
+
+    public function test_authority_resolving_complaint_sends_lifecycle_mail_and_db_notification_to_citizen(): void
+    {
+        $citizen = User::create([
+            'name' => 'Resolved Citizen',
+            'email' => 'resolved.citizen@fixmycity.org',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'city' => 'Karachi',
+            'email_verified_at' => now(),
+        ]);
+
+        $category = Category::where('category_name', 'Damaged Road / Pothole')->first();
+        $complaint = Complaint::create([
+            'tracking_number' => 'FMC-2026-RSLVD',
+            'user_id' => $citizen->id,
+            'category_id' => $category->id,
+            'department_id' => $category->department_id,
+            'city' => 'Karachi',
+            'latitude' => 24.87,
+            'longitude' => 67.06,
+            'title' => 'Deep Road Crater near Clifton Block 2',
+            'description' => 'Pavement collapsed completely creating hazardous pit in traffic lane.',
+            'status' => 'In Progress',
+            'priority' => 'High',
+            'moderation_status' => 'approved',
+        ]);
+
+        $authorityUser = User::where('email', 'roads@fixmycity.org')->first();
+        $authorityToken = $authorityUser->createToken('test')->plainTextToken;
+
+        $resolutionNotes = 'Asphalt road repair completed and surface smoothed by municipal crew.';
+        app('auth')->forgetGuards();
+        $response = $this->withHeader('Authorization', "Bearer {$authorityToken}")
+            ->patchJson("/api/complaints/{$complaint->id}/status", [
+                'status' => 'Resolved',
+                'notes' => $resolutionNotes,
+            ]);
+
+        $response->assertStatus(200);
+
+        // Assert ComplaintLifecycleMail sent with Resolved stage
+        Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen, $resolutionNotes) {
+            return $mail->hasTo($citizen->email) && $mail->stage === 'resolved' && $mail->remarks === $resolutionNotes;
+        });
+
+        // Assert citizen received DB notification with resolved status
+        $notif = Notification::where('user_id', $citizen->id)->where('complaint_id', $complaint->id)->first();
+        $this->assertNotNull($notif);
+        $this->assertStringContainsString('Resolved', $notif->title);
+        $this->assertStringContainsString($resolutionNotes, $notif->message);
     }
 }

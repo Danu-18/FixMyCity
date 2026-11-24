@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { apiGetNotifications, apiMarkAllNotificationsRead, apiMarkNotificationRead } from '@/lib/api';
 import { NotificationItem } from '@/lib/types';
 import { Bell, CheckCheck, ExternalLink, X } from 'lucide-react';
@@ -14,7 +14,8 @@ interface NotificationModalProps {
 }
 
 export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
-  const { refreshNotifications } = useAuth();
+  const router = useRouter();
+  const { user, refreshNotifications } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -31,10 +32,11 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
   };
 
   useEffect(() => {
-    if (isOpen) {
+    setNotifications([]);
+    if (isOpen && user?.id) {
       fetchNotifs();
     }
-  }, [isOpen]);
+  }, [isOpen, user?.id]);
 
   const handleMarkRead = async (id: number) => {
     try {
@@ -43,9 +45,8 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
       refreshNotifications();
-      toast.info('Notification marked as read.');
     } catch {
-      toast.error('Failed to update notification status.');
+      // Handled silently
     }
   };
 
@@ -57,6 +58,21 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
       toast.success('All notifications marked as read.');
     } catch {
       toast.error('Failed to mark all as read.');
+    }
+  };
+
+  const handleNotificationClick = async (notif: NotificationItem) => {
+    if (!notif.is_read) {
+      await handleMarkRead(notif.id);
+    }
+    onClose();
+
+    if (notif.complaint_id) {
+      router.push(`/complaints/${notif.complaint_id}`);
+    } else if (user?.role === 'super_admin' || user?.role === 'authority') {
+      router.push('/dashboard');
+    } else {
+      router.push('/track');
     }
   };
 
@@ -73,7 +89,7 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleMarkAllRead}
-              className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold transition-colors"
+              className="text-xs text-primary hover:underline flex items-center gap-1 font-semibold transition-colors cursor-pointer"
               title="Mark all as read"
             >
               <CheckCheck className="w-3.5 h-3.5" />
@@ -81,7 +97,7 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -101,7 +117,8 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
             notifications.map((notif) => (
               <div
                 key={notif.id}
-                className={`p-4 transition-colors ${
+                onClick={() => handleNotificationClick(notif)}
+                className={`p-4 transition-colors cursor-pointer hover:bg-accent/40 ${
                   notif.is_read ? 'bg-card/40' : 'bg-primary/5'
                 }`}
               >
@@ -111,8 +128,11 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
                   </h4>
                   {!notif.is_read && (
                     <button
-                      onClick={() => handleMarkRead(notif.id)}
-                      className="text-[10px] text-primary hover:underline shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkRead(notif.id);
+                      }}
+                      className="text-[10px] text-primary hover:underline shrink-0 font-semibold cursor-pointer"
                     >
                       Mark read
                     </button>
@@ -126,14 +146,10 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
                 <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
                   <span>{new Date(notif.created_at).toLocaleString()}</span>
                   {notif.complaint_id && (
-                    <Link
-                      href={`/complaints/${notif.complaint_id}`}
-                      onClick={onClose}
-                      className="inline-flex items-center gap-1 font-semibold text-primary hover:underline"
-                    >
+                    <span className="inline-flex items-center gap-1 font-semibold text-primary">
                       <span>View Incident</span>
                       <ExternalLink className="w-3 h-3" />
-                    </Link>
+                    </span>
                   )}
                 </div>
               </div>

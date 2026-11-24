@@ -15,7 +15,6 @@ class NotificationController extends Controller
 
         $notifications = Notification::where('user_id', $user->id)
             ->with('complaint:id,tracking_number,title,status')
-            ->orderBy('is_read', 'asc')
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -33,7 +32,20 @@ class NotificationController extends Controller
     {
         $user = $request->user();
 
-        $notification = Notification::where('user_id', $user->id)->findOrFail($id);
+        $notification = Notification::find($id);
+
+        if (!$notification) {
+            return response()->json([
+                'message' => 'Notification not found.',
+            ], 404);
+        }
+
+        if ($notification->user_id !== $user->id) {
+            return response()->json([
+                'message' => 'Forbidden. You do not have permission to modify this notification.',
+            ], 403);
+        }
+
         $notification->update(['is_read' => true]);
 
         return response()->json([
@@ -52,6 +64,31 @@ class NotificationController extends Controller
 
         return response()->json([
             'message' => 'All notifications marked as read',
+        ]);
+    }
+
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $user = $request->user();
+
+        $notification = Notification::find($id);
+
+        if (!$notification) {
+            return response()->json([
+                'message' => 'Notification not found.',
+            ], 404);
+        }
+
+        if ($notification->user_id !== $user->id) {
+            return response()->json([
+                'message' => 'Forbidden. You do not have permission to delete this notification.',
+            ], 403);
+        }
+
+        $notification->delete();
+
+        return response()->json([
+            'message' => 'Notification deleted successfully.',
         ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use App\Models\Notification;
 use App\Models\User;
+use App\Services\ComplaintNotificationService;
 use App\Services\ComplaintRoutingEngine;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -108,8 +109,12 @@ class SuperAdminController extends Controller
     /**
      * Approve and publish a complaint.
      */
-    public function approveComplaint(Request $request, int $id, ComplaintRoutingEngine $routingEngine): JsonResponse
-    {
+    public function approveComplaint(
+        Request $request,
+        int $id,
+        ComplaintRoutingEngine $routingEngine,
+        ComplaintNotificationService $notificationService
+    ): JsonResponse {
         $complaint = Complaint::findOrFail($id);
 
         // Recompute SLA deadline starting from approval time so SLA is not penalized by moderation queue wait
@@ -123,34 +128,8 @@ class SuperAdminController extends Controller
             'sla_deadline' => $routing['sla_deadline'],
         ]);
 
-        // Dispatch department officer assignment notification
-        $staffMembers = User::where('role', 'authority')
-            ->where('department_id', $complaint->department_id)
-            ->when(!empty($complaint->city), function ($q) use ($complaint) {
-                $q->where('city', $complaint->city);
-            })
-            ->get();
-
-        foreach ($staffMembers as $staff) {
-            Notification::create([
-                'user_id' => $staff->id,
-                'complaint_id' => $complaint->id,
-                'title' => "New Approved Complaint: #{$complaint->tracking_number}",
-                'message' => "A new complaint '{$complaint->title}' in {$complaint->city} has been approved and assigned to your department.",
-                'type' => 'complaint_assigned',
-            ]);
-        }
-
-        // Notify citizen
-        if ($complaint->user_id) {
-            Notification::create([
-                'user_id' => $complaint->user_id,
-                'complaint_id' => $complaint->id,
-                'title' => "Complaint #{$complaint->tracking_number} Approved",
-                'message' => "Your complaint '{$complaint->title}' has been approved and is now public.",
-                'type' => 'moderation_approved',
-            ]);
-        }
+        // Centralized citizen + matching city authority notification & email dispatch
+        $notificationService->notifyComplaintApproved($complaint);
 
         return response()->json([
             'message' => 'Complaint approved and published successfully.',
@@ -161,8 +140,11 @@ class SuperAdminController extends Controller
     /**
      * Reject an inappropriate complaint with a required reason.
      */
-    public function rejectComplaint(Request $request, int $id): JsonResponse
-    {
+    public function rejectComplaint(
+        Request $request,
+        int $id,
+        ComplaintNotificationService $notificationService
+    ): JsonResponse {
         $complaint = Complaint::findOrFail($id);
 
         $validated = $request->validate([
@@ -177,16 +159,8 @@ class SuperAdminController extends Controller
             'moderated_at' => now(),
         ]);
 
-        // Notify submitting citizen
-        if ($complaint->user_id) {
-            Notification::create([
-                'user_id' => $complaint->user_id,
-                'complaint_id' => $complaint->id,
-                'title' => "Complaint #{$complaint->tracking_number} Rejected",
-                'message' => "Your complaint '{$complaint->title}' was rejected during moderation. Reason: {$validated['reason']}",
-                'type' => 'moderation_rejected',
-            ]);
-        }
+        // Centralized citizen rejection notification & email dispatch
+        $notificationService->notifyComplaintModerationRejected($complaint, $validated['reason']);
 
         return response()->json([
             'message' => 'Complaint has been rejected.',

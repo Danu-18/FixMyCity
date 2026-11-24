@@ -604,7 +604,7 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
 
-            // Add notification
+            // Citizen notification (strictly for the reporting citizen)
             Notification::create([
                 'user_id' => $sc['user']->id,
                 'complaint_id' => $complaint->id,
@@ -613,6 +613,37 @@ class DatabaseSeeder extends Seeder
                 'type' => 'status_change',
                 'created_at' => $sc['created_at'],
             ]);
+
+            // Super Admin notification for pending review complaints
+            if (($sc['mod_status'] ?? 'approved') === 'pending_review') {
+                Notification::create([
+                    'user_id' => $superAdminUser->id,
+                    'complaint_id' => $complaint->id,
+                    'title' => "New Complaint Pending Review #{$complaint->tracking_number}",
+                    'message' => "A new complaint '{$complaint->title}' in {$complaint->city} requires moderation review.",
+                    'type' => 'moderation_review',
+                    'created_at' => $complaint->created_at,
+                ]);
+            }
+
+            // Authority notification for the matching department officer in that specific city
+            if (($sc['mod_status'] ?? 'approved') === 'approved') {
+                $matchingAuthority = User::where('role', 'authority')
+                    ->where('department_id', $complaint->department_id)
+                    ->where('city', $complaint->city)
+                    ->first();
+
+                if ($matchingAuthority) {
+                    Notification::create([
+                        'user_id' => $matchingAuthority->id,
+                        'complaint_id' => $complaint->id,
+                        'title' => "New Assigned Complaint #{$complaint->tracking_number}",
+                        'message' => "A new {$complaint->priority} complaint in {$complaint->city} was assigned to your department.",
+                        'type' => 'complaint_assigned',
+                        'created_at' => $complaint->created_at,
+                    ]);
+                }
+            }
         }
     }
 }
