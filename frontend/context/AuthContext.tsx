@@ -11,10 +11,11 @@ interface AuthContextType {
   isLoading: boolean;
   unreadCount: number;
   login: (email: string, password: string) => Promise<User>;
-  register: (userData: any) => Promise<User>;
+  register: (userData: any) => Promise<any>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  setSession: (user: User, token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -70,15 +71,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.user;
   };
 
-  const register = async (userData: any): Promise<User> => {
+  const register = async (userData: any): Promise<any> => {
     const res = await apiRegister(userData);
-    if (res.token) {
+    if (res.token && res.user) {
       localStorage.setItem('fmc_auth_token', res.token);
       setToken(res.token);
       setUser(res.user);
       refreshNotifications();
     }
-    return res.user;
+    return res;
+  };
+
+  const setSession = (newUser: User, newToken: string) => {
+    localStorage.setItem('fmc_auth_token', newToken);
+    setToken(newToken);
+    setUser(newUser);
+    refreshNotifications();
   };
 
   const logout = async () => {
@@ -106,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         refreshUser,
         refreshNotifications,
+        setSession,
       }}
     >
       {children}

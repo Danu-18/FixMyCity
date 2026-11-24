@@ -228,6 +228,7 @@ class DatabaseSeeder extends Seeder
 
         // 3. Seed Users (RBAC)
         $hashedPassword = Hash::make('password123');
+        $verifiedAt = Carbon::now();
 
         // Super Admin
         $superAdminUser = User::create([
@@ -238,6 +239,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Islamabad',
             'phone' => '+92 300 9999999',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         // Citizens
@@ -249,6 +251,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'phone' => '+92 370 3130213',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         $citizenAyesha = User::create([
@@ -259,6 +262,7 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'phone' => '+92 300 1234567',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         // Authority Staff (Karachi)
@@ -271,6 +275,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
             'phone' => '+92 321 9876543',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         $staffWater = User::create([
@@ -282,6 +287,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Water & Sanitation']->id,
             'phone' => '+92 333 4567890',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         $staffPower = User::create([
@@ -293,6 +299,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Electricity & Power Utilities']->id,
             'phone' => '+92 312 3456789',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         $staffWaste = User::create([
@@ -304,6 +311,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Municipal Waste Management']->id,
             'phone' => '+92 345 6789012',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         $staffSafety = User::create([
@@ -315,6 +323,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Public Safety & Security']->id,
             'phone' => '+92 301 2345678',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         // Authority Staff (Lahore - for cross-city isolation testing)
@@ -327,6 +336,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Lahore',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
             'phone' => '+92 321 1122334',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         // Admin
@@ -339,6 +349,7 @@ class DatabaseSeeder extends Seeder
             'city' => 'Karachi',
             'department_id' => $deptMap['Central Administration / IT']->id,
             'phone' => '+92 300 0000000',
+            'email_verified_at' => $verifiedAt,
         ]);
 
         // 4. Seed Complaints with Realistic Pakistani Geospatial Coordinates & Details

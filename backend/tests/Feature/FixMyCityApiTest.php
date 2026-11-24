@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\CitizenVerificationCodeMail;
 use App\Models\Category;
 use App\Models\Complaint;
 use App\Models\Department;
@@ -9,6 +10,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -17,6 +19,7 @@ class FixMyCityApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        Mail::fake();
         $this->withoutMiddleware([\Illuminate\Routing\Middleware\ThrottleRequests::class]);
         $this->artisan('migrate');
         $this->artisan('db:seed');
@@ -774,5 +777,167 @@ class FixMyCityApiTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['image']);
         $this->assertEquals('The image field is required.', $response->json('errors.image.0'));
+    }
+
+    public function test_citizen_signup_sends_otp_and_returns_requires_verification_with_no_token(): void
+    {
+        $email = 'newcitizen@example.com';
+        $response = $this->postJson('/api/register', [
+            'name' => 'New Citizen',
+            'email' => $email,
+            'password' => 'secret12345',
+            'phone' => '+92 300 1122334',
+            'city' => 'Lahore',
+            'role' => 'citizen',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonPath('requires_verification', true);
+        $response->assertJsonPath('email', $email);
+        $response->assertJsonMissing(['token']);
+        $this->assertNull($response->json('token'));
+
+        $user = User::where('email', $email)->first();
+        $this->assertNotNull($user);
+        $this->assertEquals('citizen', $user->role);
+        $this->assertNull($user->email_verified_at);
+        $this->assertNotNull($user->email_verification_code);
+        $this->assertNotNull($user->email_verification_expires_at);
+
+        Mail::assertSent(CitizenVerificationCodeMail::class, function ($mail) use ($email) {
+            return $mail->hasTo($email);
+        });
+    }
+
+    public function test_unverified_citizen_login_is_blocked_with_403(): void
+    {
+        $user = User::create([
+            'name' => 'Unverified Citizen',
+            'email' => 'unverified@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => null,
+            'email_verification_code' => Hash::make('123456'),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        $response = $this->postJson('/api/login', [
+            'email' => 'unverified@example.com',
+            'password' => 'password123',
+        ]);
+
+        $response->assertStatus(403);
+        $response->assertJsonPath('requires_verification', true);
+        $response->assertJsonPath('email', 'unverified@example.com');
+        $this->assertStringContainsString('verify your email address', $response->json('message'));
+    }
+
+    public function test_wrong_or_expired_otp_is_rejected(): void
+    {
+        $user = User::create([
+            'name' => 'OTP Test User',
+            'email' => 'otptest@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => null,
+            'email_verification_code' => Hash::make('654321'),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        // Wrong OTP code
+        $wrongResponse = $this->postJson('/api/email/verify', [
+            'email' => 'otptest@example.com',
+            'code' => '999999',
+        ]);
+
+        $wrongResponse->assertStatus(422);
+        $this->assertEquals('Invalid or expired verification code.', $wrongResponse->json('message'));
+        $this->assertNull($user->fresh()->email_verified_at);
+
+        // Expired OTP code
+        $user->update([
+            'email_verification_expires_at' => now()->subMinute(),
+        ]);
+
+        $expiredResponse = $this->postJson('/api/email/verify', [
+            'email' => 'otptest@example.com',
+            'code' => '654321',
+        ]);
+
+        $expiredResponse->assertStatus(422);
+        $this->assertEquals('Invalid or expired verification code.', $expiredResponse->json('message'));
+        $this->assertNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_valid_otp_verifies_account_and_issues_auth_token(): void
+    {
+        $user = User::create([
+            'name' => 'Valid OTP User',
+            'email' => 'validotp@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => null,
+            'email_verification_code' => Hash::make('456789'),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        $response = $this->postJson('/api/email/verify', [
+            'email' => 'validotp@example.com',
+            'code' => '456789',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['message', 'user', 'token']);
+        $this->assertNotEmpty($response->json('token'));
+        $this->assertEquals('validotp@example.com', $response->json('user.email'));
+
+        $freshUser = $user->fresh();
+        $this->assertNotNull($freshUser->email_verified_at);
+        $this->assertNull($freshUser->email_verification_code);
+        $this->assertNull($freshUser->email_verification_expires_at);
+
+        // Now user can log in without issue
+        $loginResponse = $this->postJson('/api/login', [
+            'email' => 'validotp@example.com',
+            'password' => 'password123',
+        ]);
+
+        $loginResponse->assertStatus(200);
+        $this->assertNotEmpty($loginResponse->json('token'));
+    }
+
+    public function test_resend_otp_generates_fresh_code_and_dispatches_email(): void
+    {
+        $user = User::create([
+            'name' => 'Resend OTP User',
+            'email' => 'resendotp@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => null,
+            'email_verification_code' => Hash::make('111111'),
+            'email_verification_expires_at' => now()->subMinute(), // expired old code
+        ]);
+
+        $response = $this->postJson('/api/email/resend', [
+            'email' => 'resendotp@example.com',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('requires_verification', true);
+        $response->assertJsonPath('email', 'resendotp@example.com');
+        $this->assertStringContainsString('fresh 6-digit verification code', $response->json('message'));
+
+        $freshUser = $user->fresh();
+        $this->assertNotNull($freshUser->email_verification_code);
+        $this->assertFalse(Hash::check('111111', $freshUser->email_verification_code));
+        $this->assertTrue(now()->isBefore($freshUser->email_verification_expires_at));
+
+        Mail::assertSent(CitizenVerificationCodeMail::class, function ($mail) {
+            return $mail->hasTo('resendotp@example.com');
+        });
     }
 }

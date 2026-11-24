@@ -78,10 +78,29 @@ export async function apiRegister(
         role?: string;
         department_id?: number | null;
       }
-): Promise<{ message?: string; token?: string | null; user: User }> {
+): Promise<{ message?: string; token?: string | null; user?: User; requires_verification?: boolean; email?: string }> {
   return apiFetch('/auth/register', {
     method: 'POST',
     body: userData instanceof FormData ? userData : JSON.stringify(userData),
+  });
+}
+
+export async function apiVerifyEmail(
+  email: string,
+  code: string
+): Promise<{ message: string; user: User; token: string }> {
+  return apiFetch('/email/verify', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export async function apiResendVerification(
+  email: string
+): Promise<{ message: string; requires_verification?: boolean; email: string }> {
+  return apiFetch('/email/resend', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
   });
 }
 

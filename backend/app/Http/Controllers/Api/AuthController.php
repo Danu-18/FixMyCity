@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CitizenVerificationCodeMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -55,6 +57,8 @@ class AuthController extends Controller
         }
 
         // Citizen registration
+        $code = (string) random_int(100000, 999999);
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
@@ -64,15 +68,103 @@ class AuthController extends Controller
             'role' => 'citizen',
             'status' => 'active',
             'department_id' => null,
+            'email_verified_at' => null,
+            'email_verification_code' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        Mail::to($user->email)->send(new CitizenVerificationCodeMail($code, 15));
+
+        return response()->json([
+            'message' => 'A 6-digit verification code has been sent to your email.',
+            'requires_verification' => true,
+            'email' => $user->email,
+        ], 201);
+    }
+
+    public function verifyEmail(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'code' => 'required|string|size:6',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'message' => 'Email is already verified.',
+                'user' => $user->load('department'),
+                'token' => $user->createToken('auth_token')->plainTextToken,
+            ]);
+        }
+
+        if (
+            empty($user->email_verification_code) ||
+            empty($user->email_verification_expires_at) ||
+            now()->isAfter($user->email_verification_expires_at) ||
+            !Hash::check($request->code, $user->email_verification_code)
+        ) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        $user->update([
+            'email_verified_at' => now(),
+            'email_verification_code' => null,
+            'email_verification_expires_at' => null,
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'User registered successfully',
-            'user' => $user,
+            'message' => 'Email verified successfully.',
+            'user' => $user->load('department'),
             'token' => $token,
-        ], 201);
+        ]);
+    }
+
+    public function resendVerification(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'No account found with this email address.',
+            ], 404);
+        }
+
+        if ($user->email_verified_at !== null) {
+            return response()->json([
+                'message' => 'Email is already verified.',
+            ], 400);
+        }
+
+        $code = (string) random_int(100000, 999999);
+
+        $user->update([
+            'email_verification_code' => Hash::make($code),
+            'email_verification_expires_at' => now()->addMinutes(15),
+        ]);
+
+        Mail::to($user->email)->send(new CitizenVerificationCodeMail($code, 15));
+
+        return response()->json([
+            'message' => 'A fresh 6-digit verification code has been sent to your email.',
+            'requires_verification' => true,
+            'email' => $user->email,
+        ]);
     }
 
     public function login(Request $request): JsonResponse
@@ -88,6 +180,15 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials do not match our records.'],
             ]);
+        }
+
+        // Enforce citizen email verification check
+        if ($user->role === 'citizen' && $user->email_verified_at === null) {
+            return response()->json([
+                'message' => 'Please verify your email address before logging in.',
+                'requires_verification' => true,
+                'email' => $user->email,
+            ], 403);
         }
 
         // Enforce account status check

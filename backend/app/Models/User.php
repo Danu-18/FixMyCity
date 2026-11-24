@@ -23,6 +23,9 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'email_verified_at',
+        'email_verification_code',
+        'email_verification_expires_at',
         'password',
         'role',
         'city',
@@ -42,6 +45,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_code',
     ];
 
     /**
@@ -53,6 +57,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_verification_expires_at' => 'datetime',
             'approved_at' => 'datetime',
             'password' => 'hashed',
         ];

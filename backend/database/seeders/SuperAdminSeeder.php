@@ -22,6 +22,7 @@ class SuperAdminSeeder extends Seeder
                 'status' => 'active',
                 'city' => 'Islamabad',
                 'phone' => '+92 300 9999999',
+                'email_verified_at' => now(),
             ]
         );
 

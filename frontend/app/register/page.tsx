@@ -3,9 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { apiGetDepartments } from '@/lib/api';
+import { apiGetDepartments, apiResendVerification, apiVerifyEmail } from '@/lib/api';
 import { Department } from '@/lib/types';
 import {
+  ArrowLeft,
   BadgeCheck,
   Building2,
   CheckCircle2,
@@ -17,6 +18,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  RotateCw,
   ShieldCheck,
   UploadCloud,
   User,
@@ -27,7 +29,7 @@ import { PAKISTAN_CITIES } from '@/lib/constants';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
+  const { register, setSession } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -48,6 +50,23 @@ export default function RegisterPage() {
     departmentName: string;
     fileName: string;
   } | null>(null);
+
+  // Email OTP verification states
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpLoading, setIsOtpLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+
+  // Cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   useEffect(() => {
     async function loadDepts() {
@@ -112,7 +131,7 @@ export default function RegisterPage() {
         }
       }
 
-      await register(formData);
+      const regRes = await register(formData);
 
       if (role === 'authority') {
         const selectedDept = departments.find((d) => String(d.id) === String(departmentId));
@@ -126,8 +145,16 @@ export default function RegisterPage() {
         setIsPendingReview(true);
         toast.info('Staff application submitted for Super Admin verification.');
       } else {
-        toast.success('Account created successfully! Welcome to FixMyCity.');
-        router.push('/dashboard');
+        if (regRes?.requires_verification) {
+          setVerificationEmail(regRes.email || email.trim());
+          setIsVerifyingEmail(true);
+          setResendCooldown(60);
+          setOtpCode('');
+          toast.info(regRes.message || 'A 6-digit verification code has been sent to your email.');
+        } else {
+          toast.success('Account created successfully! Welcome to FixMyCity.');
+          router.push('/dashboard');
+        }
       }
     } catch (err: any) {
       const msg = err.message || 'Registration failed. Please check the provided info.';
@@ -136,6 +163,128 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode || otpCode.trim().length !== 6) {
+      toast.error('Please enter the 6-digit verification code.');
+      return;
+    }
+
+    setIsOtpLoading(true);
+    try {
+      const res = await apiVerifyEmail(verificationEmail, otpCode.trim());
+      setSession(res.user, res.token);
+      toast.success('Email verified successfully! Welcome to FixMyCity.');
+      router.push('/dashboard');
+    } catch (err: any) {
+      toast.error(err.message || 'Invalid or expired verification code.');
+    } finally {
+      setIsOtpLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+    try {
+      const res = await apiResendVerification(verificationEmail);
+      toast.success(res.message || 'A fresh verification code has been sent to your email.');
+      setResendCooldown(60);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend verification code.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  // In-place email OTP verification view
+  if (isVerifyingEmail) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 w-full flex-1 flex flex-col justify-center">
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-md text-center space-y-6">
+          <div className="w-16 h-16 rounded-full bg-primary/15 text-primary flex items-center justify-center mx-auto ring-8 ring-primary/10">
+            <Mail className="w-8 h-8" />
+          </div>
+
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/15 text-primary text-xs font-bold uppercase tracking-wider mb-2">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Email Verification
+            </div>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+              Verify Your Email
+            </h1>
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              We have sent a 6-digit verification code to{' '}
+              <span className="font-semibold text-foreground">{verificationEmail}</span>.
+              Please enter the code below to complete your registration.
+            </p>
+          </div>
+
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div>
+              <label htmlFor="otpCode" className="block text-xs font-semibold text-foreground mb-2 text-left">
+                6-Digit Verification Code
+              </label>
+              <input
+                id="otpCode"
+                type="text"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                required
+                className="w-full text-center tracking-[0.5em] font-mono text-2xl px-4 py-3 bg-background border border-input rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground placeholder:text-muted-foreground/40 font-bold"
+              />
+              <p className="mt-2 text-[11px] text-muted-foreground text-left">
+                Code expires in 15 minutes. Check your spam/junk folder if not received.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isOtpLoading || otpCode.length !== 6}
+              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {isOtpLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Verify & Continue'
+              )}
+            </button>
+          </form>
+
+          <div className="pt-2 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={resendCooldown > 0 || isResending}
+              className="text-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline flex items-center gap-1.5 cursor-pointer"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isResending ? 'animate-spin' : ''}`} />
+              {resendCooldown > 0 ? `Resend Code (${resendCooldown}s)` : 'Resend Code'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsVerifyingEmail(false);
+                setOtpCode('');
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Back to Form
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Confirmation view when municipal staff application is under review
   if (isPendingReview && submittedStaffData) {

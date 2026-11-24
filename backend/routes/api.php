@@ -19,10 +19,20 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:5,1')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
 
     Route::prefix('auth')->group(function () {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/email/verify', [AuthController::class, 'verifyEmail']);
+    });
+});
+
+Route::middleware('throttle:3,1')->group(function () {
+    Route::post('/email/resend', [AuthController::class, 'resendVerification']);
+
+    Route::prefix('auth')->group(function () {
+        Route::post('/email/resend', [AuthController::class, 'resendVerification']);
     });
 });
 
