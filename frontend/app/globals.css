@@ -212,3 +212,13 @@
     transform: none;
   }
 }
+
+/*
+ * Leaflet Stacking Context Isolation
+ * Prevents Leaflet's internal high z-index (up to 1000) from overlapping sticky navigation headers, menus, and modals
+ */
+.leaflet-container {
+  z-index: 0 !important;
+  isolation: isolate;
+  position: relative;
+}

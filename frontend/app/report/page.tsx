@@ -753,7 +753,7 @@ export default function ReportComplaintPage() {
             </div>
           </div>
 
-          <div>
+          <div className="relative z-0 isolate">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-primary" />

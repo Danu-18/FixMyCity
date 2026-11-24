@@ -338,7 +338,7 @@ export default function LeafletMap({
   };
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
+    <div className="relative z-0 isolate w-full rounded-2xl overflow-hidden border border-border shadow-sm">
       {/* Map Layer Switcher (if explore mode) */}
       {(mode === 'heatmap' || mode === 'markers') && (
         <div className="absolute top-3 right-3 z-10 flex bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-xl p-1 shadow-md border border-zinc-200 dark:border-zinc-800">
@@ -389,7 +389,7 @@ export default function LeafletMap({
         </div>
       )}
 
-      <div ref={mapContainerRef} style={{ height, width: '100%' }} />
+      <div ref={mapContainerRef} className="relative z-0 isolate" style={{ height, width: '100%' }} />
     </div>
   );
 }

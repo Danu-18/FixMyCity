@@ -218,7 +218,7 @@ export default function ExploreMapPage() {
       </div>
 
       {/* Map Display & Selected Drawer */}
-      <div className="relative flex-1 min-h-[550px] flex flex-col rounded-xl overflow-hidden border border-border">
+      <div className="relative z-0 isolate flex-1 min-h-[550px] flex flex-col rounded-xl overflow-hidden border border-border">
         <LeafletMap
           mode="heatmap"
           points={points}
