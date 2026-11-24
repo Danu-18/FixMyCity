@@ -90,11 +90,23 @@ export interface Complaint {
     id: number;
     name: string;
     role: string;
+    email?: string | null;
   } | null;
   status_history?: StatusHistoryItem[];
   upvotes_count?: number;
   has_upvoted?: boolean;
   is_sla_breached?: boolean;
+  moderation_status?: 'pending_review' | 'approved' | 'rejected';
+  moderation_reason?: string | null;
+  moderated_by?: number | null;
+  moderated_at?: string | null;
+  is_flagged?: boolean;
+  flag_reason?: string | null;
+  moderator?: {
+    id: number;
+    name: string;
+    role: string;
+  } | null;
 }
 
 export interface HeatmapPoint {

@@ -29,6 +29,8 @@ class HeatmapController extends Controller
                 'created_at',
             ]);
 
+        $query->where('moderation_status', 'approved');
+
         if ($status = $request->query('status')) {
             if ($status !== 'All') {
                 $query->where('status', $status);

@@ -3,7 +3,14 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
-import { apiGetComplaint, apiToggleUpvote, apiUpdateComplaintStatus } from '@/lib/api';
+import {
+  apiApproveComplaint,
+  apiFlagComplaint,
+  apiGetComplaint,
+  apiRejectComplaint,
+  apiToggleUpvote,
+  apiUpdateComplaintStatus,
+} from '@/lib/api';
 import { Complaint } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
 import { PriorityBadge } from '@/components/PriorityBadge';
@@ -14,15 +21,20 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  Check,
   CheckCircle,
   Clock,
+  Flag,
   History,
   Image as ImageIcon,
   Loader2,
   MapPin,
+  ShieldAlert,
+  ShieldCheck,
   ThumbsUp,
   User,
   Wrench,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
@@ -58,6 +70,72 @@ function ComplaintDetailContent() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<boolean>(false);
   const [statusSuccessMsg, setStatusSuccessMsg] = useState<string | null>(null);
   const [statusErrorMsg, setStatusErrorMsg] = useState<string | null>(null);
+
+  // Flagging State
+  const [isFlagModalOpen, setIsFlagModalOpen] = useState<boolean>(false);
+  const [flagReason, setFlagReason] = useState<string>('');
+  const [isSubmittingFlag, setIsSubmittingFlag] = useState<boolean>(false);
+
+  const handleFlagComplaint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!complaint) return;
+    if (!flagReason || flagReason.trim().length < 5) {
+      toast.warn('Please provide a specific reason for reporting (minimum 5 characters).');
+      return;
+    }
+
+    setIsSubmittingFlag(true);
+    try {
+      const res = await apiFlagComplaint(complaint.id, flagReason.trim());
+      setComplaint((prev) => prev ? { ...prev, is_flagged: true, flag_reason: flagReason.trim() } : null);
+      toast.success('Complaint flagged for moderation review. Thank you for keeping our community safe.');
+      setIsFlagModalOpen(false);
+      setFlagReason('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to submit flag report.');
+    } finally {
+      setIsSubmittingFlag(false);
+    }
+  };
+
+  // Super Admin Direct Moderation State
+  const [isModerating, setIsModerating] = useState<boolean>(false);
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+
+  const handleApproveModeration = async () => {
+    if (!complaint) return;
+    setIsModerating(true);
+    try {
+      const res = await apiApproveComplaint(complaint.id);
+      setComplaint(res.complaint);
+      toast.success(res.message || 'Complaint approved and published!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve complaint.');
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const handleRejectModeration = async () => {
+    if (!complaint) return;
+    if (!rejectionReason || rejectionReason.trim().length < 5) {
+      toast.warn('Please provide a rejection reason (minimum 5 characters).');
+      return;
+    }
+    setIsModerating(true);
+    try {
+      const res = await apiRejectComplaint(complaint.id, rejectionReason.trim());
+      setComplaint(res.complaint);
+      toast.success(res.message || 'Complaint rejected by moderation.');
+      setIsRejectModalOpen(false);
+      setRejectionReason('');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject complaint.');
+    } finally {
+      setIsModerating(false);
+    }
+  };
 
   const fetchComplaint = async () => {
     setIsLoading(true);
@@ -141,11 +219,22 @@ function ComplaintDetailContent() {
     }
   };
 
-  // Determine if current user can update this complaint
+  // Determine if complaint is in a terminal status (Resolved or Rejected)
+  const isTerminalStatus = complaint?.status === 'Resolved' || complaint?.status === 'Rejected';
+
+  // Strict separation of duties: operational resolution restricted to authority role only
   const canUpdateStatus =
     user &&
-    (user.role === 'admin' ||
-      (user.role === 'authority' && user.department_id === complaint?.department_id));
+    user.role === 'authority' &&
+    user.department_id === complaint?.department_id &&
+    (!user.city || user.city === complaint?.city) &&
+    !isTerminalStatus;
+
+  // Super Admin moderation controls (only rendered if pending_review or is_flagged)
+  const canSuperAdminModerate =
+    user &&
+    user.role === 'super_admin' &&
+    (complaint?.moderation_status === 'pending_review' || Boolean(complaint?.is_flagged));
 
   if (isLoading) {
     return (
@@ -202,9 +291,24 @@ function ComplaintDetailContent() {
           {/* Header Card */}
           <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <PriorityBadge priority={complaint.priority} />
                 <StatusBadge status={complaint.status} />
+                {complaint.moderation_status === 'pending_review' && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-xs bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                    <Clock className="w-3.5 h-3.5" /> Pending Moderation
+                  </span>
+                )}
+                {complaint.moderation_status === 'rejected' && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-xs bg-destructive/10 text-destructive border border-destructive/20 px-2.5 py-0.5 rounded-full">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Moderation Rejected
+                  </span>
+                )}
+                {complaint.is_flagged && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-xs bg-destructive/10 text-destructive border border-destructive/20 px-2.5 py-0.5 rounded-full">
+                    <Flag className="w-3.5 h-3.5" /> Flagged for Review
+                  </span>
+                )}
               </div>
               <SlaBadge
                 deadline={complaint.sla_deadline}
@@ -216,6 +320,30 @@ function ComplaintDetailContent() {
             <h1 className="text-xl sm:text-2xl font-extrabold text-foreground leading-snug">
               {complaint.title}
             </h1>
+
+            {/* Moderation Warning Banners */}
+            {complaint.moderation_status === 'pending_review' && (
+              <div className="mt-3 p-3.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start gap-2.5 text-amber-900 dark:text-amber-200 text-xs">
+                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <p>
+                  <span className="font-semibold">Pending Pre-Moderation:</span> This civic report is currently under review by Super Admin. It will be published to the public feed and dispatched to city officers once approved.
+                </p>
+              </div>
+            )}
+
+            {complaint.moderation_status === 'rejected' && (
+              <div className="mt-3 p-3.5 bg-destructive/10 border border-destructive/30 rounded-xl flex items-start gap-2.5 text-destructive text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Complaint Rejected by Content Moderation</p>
+                  {complaint.moderation_reason && (
+                    <p className="mt-0.5 leading-relaxed">
+                      Reason: <span className="font-medium">{complaint.moderation_reason}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
@@ -433,6 +561,32 @@ function ComplaintDetailContent() {
               <ThumbsUp className={`w-4 h-4 ${hasUpvoted ? 'fill-current' : ''}`} />
               <span>{hasUpvoted ? 'Upvoted by You' : 'Upvote This Issue'}</span>
             </button>
+
+            {complaint.moderation_status === 'approved' && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      toast.info('Please sign in to report inappropriate content.');
+                      router.push('/login');
+                      return;
+                    }
+                    setIsFlagModalOpen(true);
+                    setFlagReason('');
+                  }}
+                  disabled={complaint.is_flagged}
+                  className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-60"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span>
+                    {complaint.is_flagged
+                      ? 'Flagged for Moderation'
+                      : 'Report / Flag Inappropriate'}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Department & SLA Information */}
@@ -498,7 +652,55 @@ function ComplaintDetailContent() {
             </div>
           </div>
 
-          {/* Authority Officer Status Update Box (Authorized for Authority & Admin) */}
+          {/* Super Admin Moderation Action Box (Strict Separation of Duties: Super Admin only moderates) */}
+          {canSuperAdminModerate && (
+            <div className="bg-amber-500/10 border-2 border-amber-500/30 rounded-xl p-6 shadow-md space-y-4">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
+                <ShieldCheck className="w-4 h-4" />
+                Super Admin Moderation Console
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                As Super Administrator, verify report legitimacy before dispatching to the municipal department. Operational resolution is handled by the assigned department.
+              </p>
+
+              {complaint.is_flagged && (
+                <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-lg text-xs">
+                  <span className="font-semibold">Abuse Flag:</span> {complaint.flag_reason || 'Flagged by citizen'}
+                </div>
+              )}
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleApproveModeration}
+                  disabled={isModerating}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isModerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>Approve & Publish to Public Feed</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRejectModalOpen(true);
+                    setRejectionReason('');
+                  }}
+                  disabled={isModerating}
+                  className="w-full py-2.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Reject Complaint</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Authority Officer Status Update Box (Authorized for Authority Only) */}
           {canUpdateStatus && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-6 shadow-md space-y-4">
               <div className="flex items-center gap-2 text-primary font-bold text-sm">
@@ -586,6 +788,144 @@ function ComplaintDetailContent() {
           )}
         </div>
       </div>
+
+      {/* Flag / Report Inappropriate Modal */}
+      {isFlagModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-destructive/5">
+              <div className="flex items-center gap-2 text-destructive">
+                <Flag className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-foreground">
+                  Report Inappropriate Content
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsFlagModalOpen(false)}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleFlagComplaint}>
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-foreground mb-1">
+                    Why are you reporting this complaint? *
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mb-2">
+                    Help Super Admins maintain platform integrity. Specify why this post violates community guidelines (minimum 5 characters).
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={flagReason}
+                    onChange={(e) => setFlagReason(e.target.value)}
+                    placeholder="e.g. Inappropriate photo, spam submission, harassing or offensive language..."
+                    className="w-full text-xs bg-background border border-input rounded-lg p-3 text-foreground outline-none focus:ring-2 focus:ring-destructive/40 focus:border-destructive resize-none"
+                    required
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                    <span>Minimum 5 characters</span>
+                    <span>{flagReason.trim().length} chars</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-border flex items-center justify-end gap-2 bg-muted/20">
+                <button
+                  type="button"
+                  onClick={() => setIsFlagModalOpen(false)}
+                  disabled={isSubmittingFlag}
+                  className="px-4 py-2 border border-input rounded-lg hover:bg-accent font-semibold text-xs text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={flagReason.trim().length < 5 || isSubmittingFlag}
+                  className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSubmittingFlag ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Flag className="w-4 h-4" />
+                  )}
+                  <span>Submit Abuse Report</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Super Admin Rejection Reason Modal */}
+      {isRejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-destructive/5">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-foreground">
+                  Reject Complaint #{complaint.tracking_number}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsRejectModalOpen(false)}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-1">
+                  Rejection Reason (Visible to Citizen) *
+                </p>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Explain clearly why this complaint cannot be published (minimum 5 characters).
+                </p>
+                <textarea
+                  rows={4}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="e.g. Duplicate report, insufficient detail, unrelated photo, issues not within municipal jurisdiction..."
+                  className="w-full text-xs bg-background border border-input rounded-lg p-3 text-foreground outline-none focus:ring-2 focus:ring-destructive/40 focus:border-destructive resize-none"
+                />
+                <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                  <span>Minimum 5 characters</span>
+                  <span>{rejectionReason.trim().length} chars</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex items-center justify-end gap-2 bg-muted/20">
+              <button
+                type="button"
+                onClick={() => setIsRejectModalOpen(false)}
+                disabled={isModerating}
+                className="px-4 py-2 border border-input rounded-lg hover:bg-accent font-semibold text-xs text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRejectModeration}
+                disabled={rejectionReason.trim().length < 5 || isModerating}
+                className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isModerating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <X className="w-4 h-4" />
+                )}
+                <span>Confirm Rejection</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

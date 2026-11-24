@@ -69,6 +69,19 @@ export function Navbar() {
                 </Link>
               );
             })}
+            {user?.role === 'super_admin' && (
+              <Link
+                href="/super-admin"
+                className={`relative py-1 transition-colors flex items-center gap-1.5 text-amber-700 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 font-semibold after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:bg-amber-500 after:transition-all ${
+                  pathname === '/super-admin'
+                    ? 'after:w-full font-bold'
+                    : 'after:w-0 hover:after:w-full'
+                }`}
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Super Admin
+              </Link>
+            )}
             <Link
               href="/report"
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary/90 hover:shadow-md"
@@ -148,7 +161,7 @@ export function Navbar() {
                         className="flex items-center gap-2 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 transition-colors font-medium"
                       >
                         <ShieldCheck className="w-3.5 h-3.5" />
-                        Staff Verification Console
+                        Super Admin Console
                       </Link>
                     )}
 

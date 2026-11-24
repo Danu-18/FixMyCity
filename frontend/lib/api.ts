@@ -211,3 +211,26 @@ export async function apiApproveStaff(id: number): Promise<{ message: string; us
 export async function apiRejectStaff(id: number): Promise<{ message: string; user: User }> {
   return apiFetch(`/super-admin/staff/${id}/reject`, { method: 'POST' });
 }
+
+// Complaint Moderation & Flagging API
+export async function apiFlagComplaint(id: number, reason: string): Promise<{ message: string; complaint: Complaint }> {
+  return apiFetch(`/complaints/${id}/flag`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function apiGetModerationQueue(): Promise<Complaint[]> {
+  return apiFetch('/super-admin/moderation-queue');
+}
+
+export async function apiApproveComplaint(id: number): Promise<{ message: string; complaint: Complaint }> {
+  return apiFetch(`/super-admin/complaints/${id}/approve`, { method: 'POST' });
+}
+
+export async function apiRejectComplaint(id: number, reason: string): Promise<{ message: string; complaint: Complaint }> {
+  return apiFetch(`/super-admin/complaints/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}

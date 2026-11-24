@@ -50,6 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/complaints/{id}/upvote', [ComplaintController::class, 'toggleUpvote']);
+    Route::post('/complaints/{id}/flag', [ComplaintController::class, 'flag']);
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -62,10 +63,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/staff/{id}/document', [SuperAdminController::class, 'viewDocument']);
         Route::post('/staff/{id}/approve', [SuperAdminController::class, 'approveStaff']);
         Route::post('/staff/{id}/reject', [SuperAdminController::class, 'rejectStaff']);
+
+        // Moderation Queue & Actions
+        Route::get('/moderation-queue', [SuperAdminController::class, 'moderationQueue']);
+        Route::post('/complaints/{id}/approve', [SuperAdminController::class, 'approveComplaint']);
+        Route::post('/complaints/{id}/reject', [SuperAdminController::class, 'rejectComplaint']);
     });
 
-    // Authority & Admin Workflow
-    Route::middleware('role:authority,admin')->group(function () {
+    // Authority & Operational Resolution Workflow
+    Route::middleware('role:authority,super_admin,admin')->group(function () {
         Route::match(['patch', 'post'], '/complaints/{id}/status', [ComplaintController::class, 'updateStatus']);
     });
 

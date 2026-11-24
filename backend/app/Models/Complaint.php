@@ -25,6 +25,12 @@ class Complaint extends Model
         'longitude',
         'address',
         'status',
+        'moderation_status',
+        'moderation_reason',
+        'moderated_by',
+        'moderated_at',
+        'is_flagged',
+        'flag_reason',
         'priority',
         'sla_deadline',
         'resolved_at',
@@ -35,8 +41,10 @@ class Complaint extends Model
     protected $casts = [
         'latitude' => 'float',
         'longitude' => 'float',
+        'is_flagged' => 'boolean',
         'sla_deadline' => 'datetime',
         'resolved_at' => 'datetime',
+        'moderated_at' => 'datetime',
     ];
 
     protected $appends = ['upvotes_count', 'is_sla_breached', 'image_url', 'resolution_image_url'];
@@ -44,6 +52,11 @@ class Complaint extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function moderator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'moderated_by');
     }
 
     public function category(): BelongsTo

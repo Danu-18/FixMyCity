@@ -14,6 +14,7 @@ import {
   isWithinPakistan,
 } from '@/lib/geocoding';
 import {
+  AlertTriangle,
   Building2,
   Camera,
   CheckCircle2,
@@ -101,6 +102,7 @@ export default function ReportComplaintPage() {
   // Submission Status
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdComplaint, setCreatedComplaint] = useState<Complaint | null>(null);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCategories() {
@@ -316,6 +318,7 @@ export default function ReportComplaintPage() {
     }
 
     setIsSubmitting(true);
+    setModerationError(null);
 
     try {
       const formData = new FormData();
@@ -338,6 +341,7 @@ export default function ReportComplaintPage() {
       toast.success(`Complaint registered! Tracking ID: ${res.complaint.tracking_number}`);
     } catch (err: any) {
       const msg = err.message || 'Failed to submit complaint. Please try again.';
+      setModerationError(msg);
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -356,7 +360,7 @@ export default function ReportComplaintPage() {
           Complaint Successfully Registered!
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your issue has been processed by the FixMyCity automated state-machine engine and routed to the responsible municipal department.
+          Your tracking ID has been generated. The complaint is currently <span className="font-semibold text-amber-600 dark:text-amber-400">Pending Moderation Review</span> by Super Admin before appearing publicly.
         </p>
 
         {/* Tracking Card */}
@@ -378,17 +382,15 @@ export default function ReportComplaintPage() {
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground font-medium">Initial Status</p>
-              <p className="font-semibold text-brand-orange mt-0.5">
-                {createdComplaint.status}
+              <p className="text-muted-foreground font-medium">Moderation Status</p>
+              <p className="font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                {createdComplaint.moderation_status === 'approved' ? 'Approved' : 'Pending Review'}
               </p>
             </div>
             <div>
-              <p className="text-muted-foreground font-medium">SLA Resolution Target</p>
-              <p className="font-semibold text-foreground mt-0.5">
-                {createdComplaint.sla_deadline
-                  ? new Date(createdComplaint.sla_deadline).toLocaleString()
-                  : '48 Hours'}
+              <p className="text-muted-foreground font-medium">Initial Status</p>
+              <p className="font-semibold text-brand-orange mt-0.5">
+                {createdComplaint.status}
               </p>
             </div>
             <div>
@@ -397,6 +399,17 @@ export default function ReportComplaintPage() {
                 {createdComplaint.category?.category_name}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Moderation notice banner */}
+        <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-left flex items-start gap-3">
+          <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-900 dark:text-amber-200">
+            <p className="font-semibold">Awaiting Content Moderation</p>
+            <p className="mt-0.5">
+              To keep our community safe and spam-free, your report is undergoing pre-moderation review. You can track its status anytime using your Tracking ID. Once approved, it will be dispatched to municipal officers and published on the live heatmap.
+            </p>
           </div>
         </div>
 
@@ -436,6 +449,16 @@ export default function ReportComplaintPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        {moderationError && (
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-xl flex items-start gap-3 text-destructive text-xs animate-in fade-in duration-200">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm">Content Moderation Alert</p>
+              <p className="mt-1 leading-relaxed">{moderationError}</p>
+            </div>
+          </div>
+        )}
+
         {/* Step 1: Category & Routing Preview */}
         <div className="bg-card border border-border rounded-xl p-6 shadow-xs">
           <h2 className="text-sm font-bold uppercase tracking-wider text-primary mb-4 flex items-center gap-2">

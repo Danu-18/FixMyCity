@@ -22,7 +22,8 @@ class SlaMonitoringService
         $now = Carbon::now();
         $warningWindow = Carbon::now()->addHours(12);
 
-        $activeComplaints = Complaint::whereIn('status', ['Pending', 'In Progress'])
+        $activeComplaints = Complaint::where('moderation_status', 'approved')
+            ->whereIn('status', ['Pending', 'In Progress'])
             ->whereNotNull('sla_deadline')
             ->with(['department', 'category', 'user'])
             ->get();

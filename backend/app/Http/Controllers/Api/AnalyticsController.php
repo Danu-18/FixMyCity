@@ -21,7 +21,7 @@ class AnalyticsController extends Controller
             $city = $currentUser->city;
         }
 
-        $baseComplaintQuery = Complaint::query();
+        $baseComplaintQuery = Complaint::where('moderation_status', 'approved');
         if ($city) {
             $baseComplaintQuery->where('city', $city);
         }
@@ -32,36 +32,66 @@ class AnalyticsController extends Controller
             ->pluck('count', 'status')
             ->toArray();
 
-        $pending = $statusCounts['Pending'] ?? 0;
-        $inProgress = $statusCounts['In Progress'] ?? 0;
-        $resolved = $statusCounts['Resolved'] ?? 0;
-        $rejected = $statusCounts['Rejected'] ?? 0;
+        $pending = 0;
+        $inProgress = 0;
+        $resolved = 0;
+        $rejected = 0;
+
+        foreach ($statusCounts as $statusName => $count) {
+            $lower = strtolower(trim((string) $statusName));
+            if ($lower === 'pending') $pending += (int) $count;
+            elseif ($lower === 'in progress') $inProgress += (int) $count;
+            elseif ($lower === 'resolved') $resolved += (int) $count;
+            elseif ($lower === 'rejected') $rejected += (int) $count;
+        }
 
         $now = Carbon::now();
 
-        // SLA compliance calculation
-        $resolvedComplaints = (clone $baseComplaintQuery)->where('status', 'Resolved')
+        // SLA compliance calculation: evaluate all complaints that have an SLA target
+        // A complaint meets its SLA target if:
+        // 1. It is Resolved and resolved_at <= sla_deadline
+        // 2. Or it is active (Pending / In Progress) and sla_deadline >= now (not overdue)
+        $complaintsWithSla = (clone $baseComplaintQuery)
             ->whereNotNull('sla_deadline')
-            ->whereNotNull('resolved_at')
             ->get();
 
-        $resolvedWithinSla = 0;
+        $totalEvaluated = $complaintsWithSla->count();
+        $compliantCount = 0;
+        $resolvedCount = 0;
         $totalResolutionHours = 0;
 
-        foreach ($resolvedComplaints as $c) {
-            if ($c->resolved_at <= $c->sla_deadline) {
-                $resolvedWithinSla++;
+        foreach ($complaintsWithSla as $c) {
+            $statusLower = strtolower(trim((string) $c->status));
+            $isResolved = $statusLower === 'resolved';
+
+            $slaDeadline = $c->sla_deadline ? Carbon::parse($c->sla_deadline) : null;
+            $resolvedAt = $c->resolved_at ? Carbon::parse($c->resolved_at) : null;
+            $createdAt = $c->created_at ? Carbon::parse($c->created_at) : null;
+
+            if ($isResolved) {
+                $resolvedCount++;
+                if ($resolvedAt && $createdAt) {
+                    $totalResolutionHours += $createdAt->diffInHours($resolvedAt);
+                }
+
+                // If resolved_at is missing or resolved before/at deadline, SLA was met
+                if (!$slaDeadline || !$resolvedAt || $resolvedAt->lte($slaDeadline)) {
+                    $compliantCount++;
+                }
+            } else {
+                // Active complaints (Pending / In Progress) meet SLA if deadline is in the future
+                if (!$slaDeadline || $slaDeadline->gte($now)) {
+                    $compliantCount++;
+                }
             }
-            $hours = $c->created_at->diffInHours($c->resolved_at);
-            $totalResolutionHours += $hours;
         }
 
-        $avgResolutionHours = $resolvedComplaints->count() > 0
-            ? round($totalResolutionHours / $resolvedComplaints->count(), 1)
+        $avgResolutionHours = $resolvedCount > 0
+            ? round($totalResolutionHours / $resolvedCount, 1)
             : 0;
 
-        $slaComplianceRate = $resolvedComplaints->count() > 0
-            ? round(($resolvedWithinSla / $resolvedComplaints->count()) * 100, 1)
+        $slaComplianceRate = $totalEvaluated > 0
+            ? round(($compliantCount / $totalEvaluated) * 100, 1)
             : 100.0;
 
         // Active SLA breaches
@@ -72,13 +102,14 @@ class AnalyticsController extends Controller
 
         // Department breakdown
         $departments = Department::withCount(['complaints' => function ($q) use ($city) {
+                $q->where('moderation_status', 'approved');
                 if ($city) {
                     $q->where('city', $city);
                 }
             }])
             ->get()
             ->map(function ($d) use ($now, $city) {
-                $deptQuery = Complaint::where('department_id', $d->id);
+                $deptQuery = Complaint::where('moderation_status', 'approved')->where('department_id', $d->id);
                 if ($city) {
                     $deptQuery->where('city', $city);
                 }
@@ -101,6 +132,7 @@ class AnalyticsController extends Controller
 
         // Category distribution
         $categories = Category::withCount(['complaints' => function ($q) use ($city) {
+                $q->where('moderation_status', 'approved');
                 if ($city) {
                     $q->where('city', $city);
                 }

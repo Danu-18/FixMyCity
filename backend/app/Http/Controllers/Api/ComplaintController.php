@@ -8,6 +8,7 @@ use App\Models\StatusHistory;
 use App\Models\Upvote;
 use App\Mail\ComplaintSubmittedMail;
 use App\Services\ComplaintRoutingEngine;
+use App\Services\ContentModerationService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ use Illuminate\Support\Str;
 class ComplaintController extends Controller
 {
     public function __construct(
-        protected ComplaintRoutingEngine $routingEngine
+        protected ComplaintRoutingEngine $routingEngine,
+        protected ContentModerationService $moderationService
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -72,6 +74,20 @@ class ComplaintController extends Controller
         // Current user complaints filter
         if ($request->boolean('mine') && $currentUser) {
             $query->where('user_id', $currentUser->id);
+        }
+
+        // Moderation visibility gating:
+        // Citizens can view their own complaints on /dashboard regardless of moderation status
+        // Super Admins can filter by moderation_status if requested
+        // All public requests, heatmap, analytics, and Authority queues only see approved complaints
+        if (!($request->boolean('mine') && $currentUser)) {
+            if ($currentUser && $currentUser->isSuperAdmin() && $request->has('moderation_status')) {
+                if ($request->query('moderation_status') !== 'All') {
+                    $query->where('moderation_status', $request->query('moderation_status'));
+                }
+            } else {
+                $query->where('moderation_status', 'approved');
+            }
         }
 
         // SLA filter
@@ -149,6 +165,19 @@ class ComplaintController extends Controller
         }
 
         $currentUser = $request->user('sanctum');
+
+        // Gating: If unapproved, allow only for owner, super admin, or direct lookup by tracking number
+        if ($complaint->moderation_status !== 'approved') {
+            $isTrackingLookup = !is_numeric($idOrTracking) || $complaint->tracking_number === $idOrTracking;
+            $isOwner = $currentUser && $currentUser->id === $complaint->user_id;
+            $isSuperAdmin = $currentUser && $currentUser->isSuperAdmin();
+
+            if (!$isTrackingLookup && !$isOwner && !$isSuperAdmin) {
+                return response()->json(['message' => 'Complaint not found or pending moderation review.'], 404);
+            }
+        }
+
+        $currentUser = $request->user('sanctum');
         $hasUpvoted = false;
         if ($currentUser) {
             $hasUpvoted = Upvote::where('complaint_id', $complaint->id)
@@ -174,6 +203,18 @@ class ComplaintController extends Controller
             'priority' => 'nullable|string|in:Low,Medium,High,Urgent',
             'image' => 'nullable|image|max:10240', // 10MB max
         ]);
+
+        // Stage 1: Deterministic Content Moderation Filter
+        $moderationResult = $this->moderationService->validate($validated['title'], $validated['description']);
+        if (!$moderationResult['valid']) {
+            return response()->json([
+                'message' => 'Your complaint contains inappropriate language or invalid text. Please describe the civic issue clearly and respectfully.',
+                'reason' => $moderationResult['reason'],
+                'errors' => [
+                    'description' => [$moderationResult['reason']],
+                ],
+            ], 422);
+        }
 
         $user = $request->user('sanctum');
 
@@ -208,6 +249,7 @@ class ComplaintController extends Controller
             'status' => 'Pending',
             'priority' => $routing['priority'],
             'sla_deadline' => $routing['sla_deadline'],
+            'moderation_status' => 'pending_review',
         ]);
 
         // Record initial status in status_history
@@ -239,7 +281,7 @@ class ComplaintController extends Controller
         }
 
         return response()->json([
-            'message' => 'Complaint successfully submitted and routed to responsible department.',
+            'message' => 'Complaint submitted successfully and is awaiting moderation review before public listing.',
             'complaint' => $complaint->fresh(['department', 'category', 'statusHistory', 'user']),
         ], 201);
     }
@@ -249,19 +291,31 @@ class ComplaintController extends Controller
         $complaint = Complaint::findOrFail($id);
         $user = $request->user();
 
-        // Check department access and city jurisdiction if authority
-        if ($user->role === 'authority') {
-            if ($user->department_id !== $complaint->department_id) {
-                return response()->json([
-                    'message' => 'Unauthorized: You can only update complaints assigned to your department.',
-                ], 403);
-            }
+        // Enforce strict separation of duties: Super Admin cannot resolve/update operational status
+        if ($user->role === 'super_admin') {
+            return response()->json([
+                'message' => 'Super Administrators moderate complaint authenticity only. Operational resolution is restricted to the assigned municipal department.',
+            ], 403);
+        }
 
-            if (!empty($user->city) && $user->city !== $complaint->city) {
-                return response()->json([
-                    'message' => 'Unauthorized: You can only update complaints within your assigned city jurisdiction.',
-                ], 403);
-            }
+        // Operational resolution strictly restricted to authority role
+        if ($user->role !== 'authority') {
+            return response()->json([
+                'message' => 'Operational resolution is restricted to the assigned municipal department.',
+            ], 403);
+        }
+
+        // Check department access and city jurisdiction for authority
+        if ($user->department_id !== $complaint->department_id) {
+            return response()->json([
+                'message' => 'Unauthorized: You can only update complaints assigned to your department.',
+            ], 403);
+        }
+
+        if (!empty($user->city) && $user->city !== $complaint->city) {
+            return response()->json([
+                'message' => 'Unauthorized: You can only update complaints within your assigned city jurisdiction.',
+            ], 403);
         }
 
         $validated = $request->validate([
@@ -321,6 +375,31 @@ class ComplaintController extends Controller
         return response()->json([
             'has_upvoted' => $hasUpvoted,
             'upvotes_count' => $newCount,
+        ]);
+    }
+
+    public function flag(Request $request, int $id): JsonResponse
+    {
+        $complaint = Complaint::findOrFail($id);
+
+        if ($complaint->moderation_status !== 'approved') {
+            return response()->json([
+                'message' => 'Only approved complaints can be flagged for moderation review.',
+            ], 400);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|string|min:5|max:500',
+        ]);
+
+        $complaint->update([
+            'is_flagged' => true,
+            'flag_reason' => $validated['reason'],
+        ]);
+
+        return response()->json([
+            'message' => 'Complaint has been flagged and submitted to Super Admin for moderation review.',
+            'complaint' => $complaint,
         ]);
     }
 }

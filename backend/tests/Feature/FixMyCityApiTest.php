@@ -17,6 +17,7 @@ class FixMyCityApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutMiddleware([\Illuminate\Routing\Middleware\ThrottleRequests::class]);
         $this->artisan('migrate');
         $this->artisan('db:seed');
     }
@@ -76,6 +77,7 @@ class FixMyCityApiTest extends TestCase
 
         $this->assertEquals($category->department_id, $complaintData['department_id']);
         $this->assertEquals('Pending', $complaintData['status']);
+        $this->assertEquals('pending_review', $complaintData['moderation_status']);
         $this->assertNotNull($complaintData['sla_deadline']);
         $this->assertStringStartsWith('FMC-', $complaintData['tracking_number']);
     }
@@ -413,5 +415,317 @@ class FixMyCityApiTest extends TestCase
         $this->assertEquals('Lahore', $lahoreHeatmap->json('points.0.city'));
 
         $this->assertEquals($totalAll, $karachiHeatmap->json('total') + $lahoreHeatmap->json('total'));
+    }
+
+    public function test_content_moderation_blocks_profanity_and_spam(): void
+    {
+        $category = Category::first();
+
+        // 1. English profanity
+        $profaneResp = $this->postJson('/api/complaints', [
+            'title' => 'Fix this fuck road immediately',
+            'description' => 'The entire street is ruined and you people are doing nothing.',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.86,
+            'longitude' => 67.00,
+        ]);
+        $profaneResp->assertStatus(422);
+        $this->assertStringContainsString('inappropriate language', $profaneResp->json('message'));
+
+        // 2. Obfuscated Roman Urdu slur
+        $obfuscatedResp = $this->postJson('/api/complaints', [
+            'title' => 'Pothole issue on main boulevard',
+            'description' => 'Ye sub k.a.m.i.n.a log hain koi kaam nahi karta yahan.',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.86,
+            'longitude' => 67.00,
+        ]);
+        $obfuscatedResp->assertStatus(422);
+        $this->assertStringContainsString('inappropriate language', $obfuscatedResp->json('message'));
+
+        // 3. Spam / Repeated characters
+        $spamResp = $this->postJson('/api/complaints', [
+            'title' => 'aaaaaaa',
+            'description' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.86,
+            'longitude' => 67.00,
+        ]);
+        $spamResp->assertStatus(422);
+        $this->assertStringContainsString('inappropriate language or invalid text', $spamResp->json('message'));
+
+        // 4. Gibberish / Mashed keys
+        $gibberishResp = $this->postJson('/api/complaints', [
+            'title' => 'zxvbnm',
+            'description' => 'qwrtypsdfghjklzxcvbnm test',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.86,
+            'longitude' => 67.00,
+        ]);
+        $gibberishResp->assertStatus(422);
+    }
+
+    public function test_clean_complaint_lands_in_pending_review_and_is_hidden_from_public_and_authority(): void
+    {
+        $citizen = User::where('role', 'citizen')->first();
+        $this->assertNotNull($citizen);
+
+        $citizenLogin = $this->postJson('/api/auth/login', [
+            'email' => $citizen->email,
+            'password' => 'password123',
+        ]);
+        $citizenToken = $citizenLogin->json('token');
+
+        $category = Category::first();
+
+        // 1. Citizen submits valid clean complaint
+        $submitResp = $this->withHeader('Authorization', "Bearer {$citizenToken}")
+            ->postJson('/api/complaints', [
+                'title' => 'Broken Water Pipe Flooding Gulberg Main Road',
+                'description' => 'Fresh water is gushing out continuously and flooding the road near Block 3.',
+                'category_id' => $category->id,
+                'city' => 'Karachi',
+                'latitude' => 24.912,
+                'longitude' => 67.078,
+            ]);
+
+        $submitResp->assertStatus(201);
+        $complaintId = $submitResp->json('complaint.id');
+        $trackingNum = $submitResp->json('complaint.tracking_number');
+        $this->assertEquals('pending_review', $submitResp->json('complaint.moderation_status'));
+
+        // 2. Complaint is hidden from public /api/complaints
+        $publicList = $this->getJson('/api/complaints');
+        $publicList->assertStatus(200);
+        $publicIds = collect($publicList->json('data'))->pluck('id')->all();
+        $this->assertNotContains($complaintId, $publicIds);
+
+        // 3. Complaint is hidden from public /api/heatmap
+        $heatmap = $this->getJson('/api/heatmap');
+        $heatmap->assertStatus(200);
+        $heatmapIds = collect($heatmap->json('points'))->pluck('id')->all();
+        $this->assertNotContains($complaintId, $heatmapIds);
+
+        // 4. Complaint is hidden from Authority action queue
+        $authLogin = $this->postJson('/api/auth/login', [
+            'email' => 'roads@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $authQueue = $this->withHeader('Authorization', "Bearer {$authLogin->json('token')}")
+            ->getJson('/api/complaints');
+        $authQueueIds = collect($authQueue->json('data'))->pluck('id')->all();
+        $this->assertNotContains($complaintId, $authQueueIds);
+
+        // 5. But submitting citizen CAN see it on personal dashboard (?mine=true)
+        $citizenQueue = $this->withHeader('Authorization', "Bearer {$citizenToken}")
+            ->getJson('/api/complaints?mine=true');
+        $citizenQueueIds = collect($citizenQueue->json('data'))->pluck('id')->all();
+        $this->assertContains($complaintId, $citizenQueueIds);
+
+        // 6. Direct lookup by tracking number is accessible
+        $trackingResp = $this->getJson("/api/complaints/{$trackingNum}");
+        $trackingResp->assertStatus(200);
+        $this->assertEquals($complaintId, $trackingResp->json('id'));
+    }
+
+    public function test_super_admin_moderation_queue_and_approval_workflow(): void
+    {
+        $category = Category::where('category_name', 'Damaged Road / Pothole')->first();
+
+        // 1. Submit a complaint that lands in pending_review
+        $submit = $this->postJson('/api/complaints', [
+            'title' => 'Deep pothole outside school gate in Karachi',
+            'description' => 'Children are at danger due to this severe trench outside the main campus.',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.85,
+            'longitude' => 67.02,
+        ]);
+        $submit->assertStatus(201);
+        $complaintId = $submit->json('complaint.id');
+
+        // 2. Super Admin logs in
+        $superAdminLogin = $this->postJson('/api/login', [
+            'email' => 'superadmin@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $superAdminToken = $superAdminLogin->json('token');
+
+        // 3. Super Admin checks moderation queue
+        $queueResp = $this->withHeader('Authorization', "Bearer {$superAdminToken}")
+            ->getJson('/api/super-admin/moderation-queue');
+        $queueResp->assertStatus(200);
+        $queueIds = collect($queueResp->json())->pluck('id')->all();
+        $this->assertContains($complaintId, $queueIds);
+
+        // 4. Super Admin approves complaint
+        $approveResp = $this->withHeader('Authorization', "Bearer {$superAdminToken}")
+            ->postJson("/api/super-admin/complaints/{$complaintId}/approve");
+        $approveResp->assertStatus(200);
+        $this->assertEquals('approved', $approveResp->json('complaint.moderation_status'));
+        $this->assertNotNull($approveResp->json('complaint.moderated_at'));
+
+        // 5. Complaint is now visible in public listing and authority queue
+        $publicList = $this->getJson('/api/complaints');
+        $publicIds = collect($publicList->json('data'))->pluck('id')->all();
+        $this->assertContains($complaintId, $publicIds);
+
+        $roadsLogin = $this->postJson('/api/auth/login', [
+            'email' => 'roads@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $roadsQueue = $this->withHeader('Authorization', "Bearer {$roadsLogin->json('token')}")
+            ->getJson('/api/complaints');
+        $roadsIds = collect($roadsQueue->json('data'))->pluck('id')->all();
+        $this->assertContains($complaintId, $roadsIds);
+    }
+
+    public function test_super_admin_rejects_complaint_with_reason(): void
+    {
+        $category = Category::first();
+
+        // 1. Submit a complaint
+        $submit = $this->postJson('/api/complaints', [
+            'title' => 'Suspicious vehicle parked on sidewalk for two weeks',
+            'description' => 'Unidentified car blocking the pedestrian walkway continuously.',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.85,
+            'longitude' => 67.02,
+        ]);
+        $complaintId = $submit->json('complaint.id');
+
+        // 2. Super Admin logs in
+        $superAdminLogin = $this->postJson('/api/login', [
+            'email' => 'superadmin@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $superAdminToken = $superAdminLogin->json('token');
+
+        // 3. Rejection requires min 5 characters reason
+        $shortReason = $this->withHeader('Authorization', "Bearer {$superAdminToken}")
+            ->postJson("/api/super-admin/complaints/{$complaintId}/reject", [
+                'reason' => 'bad',
+            ]);
+        $shortReason->assertStatus(422);
+
+        // 4. Valid rejection
+        $validReject = $this->withHeader('Authorization', "Bearer {$superAdminToken}")
+            ->postJson("/api/super-admin/complaints/{$complaintId}/reject", [
+                'reason' => 'Issue pertains to vehicle theft which falls under police jurisdiction rather than municipal.',
+            ]);
+        $validReject->assertStatus(200);
+        $this->assertEquals('rejected', $validReject->json('complaint.moderation_status'));
+        $this->assertStringContainsString('police jurisdiction', $validReject->json('complaint.moderation_reason'));
+
+        // 5. Remains hidden from public
+        $publicList = $this->getJson('/api/complaints');
+        $publicIds = collect($publicList->json('data'))->pluck('id')->all();
+        $this->assertNotContains($complaintId, $publicIds);
+    }
+
+    public function test_citizen_can_flag_approved_complaint_and_it_enters_moderation_queue(): void
+    {
+        // 1. Get an approved complaint
+        $approvedComplaint = Complaint::where('moderation_status', 'approved')->first();
+        $this->assertNotNull($approvedComplaint);
+
+        // 2. Citizen logs in
+        $citizenLogin = $this->postJson('/api/auth/login', [
+            'email' => 'citizen@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $citizenToken = $citizenLogin->json('token');
+
+        // 3. Citizen flags the complaint
+        $flagResp = $this->withHeader('Authorization', "Bearer {$citizenToken}")
+            ->postJson("/api/complaints/{$approvedComplaint->id}/flag", [
+                'reason' => 'Image contains inappropriate graffiti not related to municipal issue.',
+            ]);
+        $flagResp->assertStatus(200);
+        $this->assertTrue($flagResp->json('complaint.is_flagged'));
+        $this->assertEquals('Image contains inappropriate graffiti not related to municipal issue.', $flagResp->json('complaint.flag_reason'));
+
+        // 4. Super Admin moderation queue contains this flagged complaint
+        app('auth')->forgetGuards();
+        $superAdminLogin = $this->postJson('/api/login', [
+            'email' => 'superadmin@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        app('auth')->forgetGuards();
+        $modQueue = $this->withHeader('Authorization', "Bearer {$superAdminLogin->json('token')}")
+            ->getJson('/api/super-admin/moderation-queue');
+        $modQueue->assertStatus(200);
+        $modQueueIds = collect($modQueue->json())->pluck('id')->all();
+        $this->assertContains($approvedComplaint->id, $modQueueIds);
+    }
+
+    public function test_super_admin_cannot_operationally_update_complaint_status_but_authority_can(): void
+    {
+        // 1. Get an approved complaint for Roads department in Karachi
+        $complaint = Complaint::where('moderation_status', 'approved')
+            ->where('status', 'Pending')
+            ->first();
+        $this->assertNotNull($complaint);
+
+        // 2. Super Admin logs in
+        $superAdminLogin = $this->postJson('/api/login', [
+            'email' => 'superadmin@fixmycity.org',
+            'password' => 'password123',
+        ]);
+        $superAdminToken = $superAdminLogin->json('token');
+
+        // 3. Super Admin attempts operational status update -> must be blocked with 403
+        $superAdminUpdate = $this->withHeader('Authorization', "Bearer {$superAdminToken}")
+            ->patchJson("/api/complaints/{$complaint->id}/status", [
+                'status' => 'In Progress',
+                'notes' => 'Super admin trying to mark complaint in progress.',
+            ]);
+
+        $superAdminUpdate->assertStatus(403);
+        $this->assertEquals(
+            'Super Administrators moderate complaint authenticity only. Operational resolution is restricted to the assigned municipal department.',
+            $superAdminUpdate->json('message')
+        );
+
+        // 4. Authority logs in (matching department and city)
+        app('auth')->forgetGuards();
+        $authorityUser = User::where('role', 'authority')
+            ->where('department_id', $complaint->department_id)
+            ->whereIn('status', ['active', 'approved'])
+            ->first();
+        $this->assertNotNull($authorityUser);
+
+        $authorityLogin = $this->postJson('/api/auth/login', [
+            'email' => $authorityUser->email,
+            'password' => 'password123',
+        ]);
+        $authorityToken = $authorityLogin->json('token');
+
+        // 5. Authority successfully updates status to In Progress
+        app('auth')->forgetGuards();
+        $authorityUpdate = $this->withHeader('Authorization', "Bearer {$authorityToken}")
+            ->patchJson("/api/complaints/{$complaint->id}/status", [
+                'status' => 'In Progress',
+                'notes' => 'Dispatched engineering crew to fix issue.',
+            ]);
+
+        $authorityUpdate->assertStatus(200);
+        $this->assertEquals('In Progress', $authorityUpdate->json('complaint.status'));
+
+        // 6. Authority resolves complaint
+        app('auth')->forgetGuards();
+        $resolveUpdate = $this->withHeader('Authorization', "Bearer {$authorityToken}")
+            ->patchJson("/api/complaints/{$complaint->id}/status", [
+                'status' => 'Resolved',
+                'notes' => 'Pothole permanently patched with asphalt.',
+            ]);
+
+        $resolveUpdate->assertStatus(200);
+        $this->assertEquals('Resolved', $resolveUpdate->json('complaint.status'));
     }
 }

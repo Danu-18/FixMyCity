@@ -4,12 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
+  apiApproveComplaint,
   apiApproveStaff,
   apiDownloadStaffDocument,
   apiGetAnalytics,
   apiGetComplaints,
   apiGetDepartments,
+  apiGetModerationQueue,
   apiGetPendingStaff,
+  apiRejectComplaint,
   apiRejectStaff,
   apiTriggerSlaCheck,
   apiUpdateComplaintStatus,
@@ -18,6 +21,7 @@ import { AnalyticsOverview, Complaint, Department, User } from '@/lib/types';
 import { StatusBadge } from '@/components/StatusBadge';
 import { SlaBadge } from '@/components/SlaBadge';
 import {
+  AlertTriangle,
   Building2,
   Check,
   CheckCircle2,
@@ -27,7 +31,9 @@ import {
   Eye,
   FileCheck,
   FileText,
+  Flag,
   IdCard,
+  ImageIcon,
   Loader2,
   MapPin,
   PlusCircle,
@@ -52,7 +58,15 @@ export default function DashboardPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Super Admin Staff Verification State
+  // Super Admin Staff Verification & Moderation State
+  const [adminTab, setAdminTab] = useState<'moderation' | 'staff'>('moderation');
+  const [moderationQueue, setModerationQueue] = useState<Complaint[]>([]);
+  const [isLoadingModeration, setIsLoadingModeration] = useState<boolean>(false);
+  const [processingComplaintId, setProcessingComplaintId] = useState<number | null>(null);
+  const [previewComplaintImage, setPreviewComplaintImage] = useState<{ url: string; title: string } | null>(null);
+  const [rejectingComplaint, setRejectingComplaint] = useState<Complaint | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+
   const [pendingStaff, setPendingStaff] = useState<User[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState<boolean>(false);
   const [processingStaffId, setProcessingStaffId] = useState<number | null>(null);
@@ -105,9 +119,10 @@ export default function DashboardPage() {
           setComplaints(allComplaints.data || []);
         }
 
-        // Load pending staff if Super Admin
+        // Load pending staff and moderation queue if Super Admin
         if (user.role === 'super_admin') {
           loadPendingStaff();
+          loadModerationQueue();
         }
       }
     } catch {
@@ -126,6 +141,60 @@ export default function DashboardPage() {
       console.error('Failed to load pending staff:', err);
     } finally {
       setIsLoadingStaff(false);
+    }
+  };
+
+  const loadModerationQueue = async () => {
+    try {
+      setIsLoadingModeration(true);
+      const queue = await apiGetModerationQueue();
+      setModerationQueue(queue || []);
+    } catch (err: any) {
+      console.error('Failed to load moderation queue:', err);
+    } finally {
+      setIsLoadingModeration(false);
+    }
+  };
+
+  const handleApproveComplaint = async (complaintId: number) => {
+    try {
+      setProcessingComplaintId(complaintId);
+      const res = await apiApproveComplaint(complaintId);
+      toast.success(res.message || 'Complaint approved and published!');
+      // Immediately refresh moderation queue, city complaints registry, and analytics
+      await Promise.all([
+        loadModerationQueue(),
+        loadDashboardData(),
+      ]);
+      if (previewComplaintImage) {
+        setPreviewComplaintImage(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve complaint.');
+    } finally {
+      setProcessingComplaintId(null);
+    }
+  };
+
+  const handleRejectComplaint = async (complaintId: number, reason: string) => {
+    if (!reason || reason.trim().length < 5) {
+      toast.warn('Please provide a rejection reason (minimum 5 characters).');
+      return;
+    }
+    try {
+      setProcessingComplaintId(complaintId);
+      const res = await apiRejectComplaint(complaintId, reason.trim());
+      toast.success(res.message || 'Complaint rejected by moderation.');
+      setModerationQueue((prev) => prev.filter((c) => c.id !== complaintId));
+      setRejectingComplaint(null);
+      setRejectionReason('');
+      if (previewComplaintImage) {
+        setPreviewComplaintImage(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject complaint.');
+    } finally {
+      setProcessingComplaintId(null);
     }
   };
 
@@ -345,20 +414,20 @@ export default function DashboardPage() {
               <span className="text-[10px] opacity-80">Requires identity approval</span>
             </div>
 
-            <div className="bg-primary lift relative overflow-hidden rounded-xl p-4 text-left text-primary-foreground shadow-md">
+            <div className="bg-destructive/90 dark:bg-destructive lift relative overflow-hidden rounded-xl p-4 text-left text-white shadow-md">
               <span className="text-[10px] font-bold uppercase tracking-wider opacity-85">
-                Citywide Complaints
+                Pending Moderation Review
               </span>
-              <p className="mt-1 text-2xl font-bold">{complaints.length}</p>
-              <span className="text-[10px] opacity-80">Total civic records</span>
+              <p className="mt-1 text-2xl font-bold">{moderationQueue.length}</p>
+              <span className="text-[10px] opacity-80">Awaiting pre-moderation / abuse flags</span>
             </div>
 
-            <div className="bg-brand-violet lift relative overflow-hidden rounded-xl p-4 text-left text-primary-foreground shadow-md">
+            <div className="bg-primary lift relative overflow-hidden rounded-xl p-4 text-left text-primary-foreground shadow-md">
               <span className="text-[10px] font-bold uppercase tracking-wider opacity-85">
-                Active Departments
+                Citywide Approved Records
               </span>
-              <p className="mt-1 text-2xl font-bold">{departments.length}</p>
-              <span className="text-[10px] opacity-80">Municipal offices connected</span>
+              <p className="mt-1 text-2xl font-bold">{complaints.length}</p>
+              <span className="text-[10px] opacity-80">Published civic issues</span>
             </div>
 
             <div className="bg-brand-green lift relative overflow-hidden rounded-xl p-4 text-left text-primary-foreground shadow-md">
@@ -366,7 +435,7 @@ export default function DashboardPage() {
                 SLA Compliance Rate
               </span>
               <p className="mt-1 text-2xl font-bold">
-                {analytics?.summary?.sla_compliance_rate ?? 98.4}%
+                {analytics?.summary?.sla_compliance_rate ?? 100}%
               </p>
               <span className="text-[10px] opacity-80">Within SLA deadline target</span>
             </div>
@@ -420,134 +489,347 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* SUPER ADMIN ONLY: Staff Verification Requests Section */}
+      {/* SUPER ADMIN CONSOLE: Moderation Queue & Staff Verification */}
       {user.role === 'super_admin' && (
-        <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden mb-8">
-          <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center">
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-foreground">
-                  Staff Verification Requests
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  Verify municipal employment credentials before granting authority portal access
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
-                {pendingStaff.length} Pending Approval
-              </span>
-              <button
-                onClick={loadPendingStaff}
-                disabled={isLoadingStaff}
-                className="p-1.5 border border-input rounded-lg hover:bg-accent text-muted-foreground transition-colors"
-                title="Refresh Pending Staff"
+        <div className="mb-8 space-y-4">
+          {/* Tab Navigation */}
+          <div className="flex border-b border-border gap-2">
+            <button
+              type="button"
+              onClick={() => setAdminTab('moderation')}
+              className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                adminTab === 'moderation'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>Complaint Moderation Queue</span>
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  moderationQueue.length > 0
+                    ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                    : 'bg-muted text-muted-foreground'
+                }`}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStaff ? 'animate-spin' : ''}`} />
-              </button>
-            </div>
+                {moderationQueue.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAdminTab('staff')}
+              className={`flex items-center gap-2 px-4 py-3 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${
+                adminTab === 'staff'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" />
+              <span>Staff Verification Requests</span>
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  pendingStaff.length > 0
+                    ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                    : 'bg-muted text-muted-foreground'
+                }`}
+              >
+                {pendingStaff.length}
+              </span>
+            </button>
           </div>
 
-          {isLoadingStaff ? (
-            <div className="p-12 text-center text-xs text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
-              Loading pending staff requests...
-            </div>
-          ) : pendingStaff.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground space-y-2">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="font-semibold text-foreground">All Staff Requests Reviewed</p>
-              <p className="text-[11px]">There are no pending municipal staff registrations awaiting identity verification.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/40 text-muted-foreground border-b border-border">
-                  <tr>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applicant Name</th>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">City Jurisdiction</th>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">Requested Department</th>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applied Date</th>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider">ID Document</th>
-                    <th className="px-5 py-3 font-semibold uppercase tracking-wider text-right">Approval Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {pendingStaff.map((staff) => (
-                    <tr key={staff.id} className="hover:bg-accent/30 transition-colors">
-                      <td className="px-5 py-3.5 whitespace-nowrap">
-                        <div className="font-semibold text-foreground">{staff.name}</div>
-                        <div className="text-[11px] text-muted-foreground">{staff.email}</div>
-                      </td>
-                      <td className="px-5 py-3.5 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">
-                          <MapPin className="w-3 h-3 text-primary" />
-                          {staff.city || 'Karachi (Default)'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 whitespace-nowrap">
-                        <span className="font-medium text-primary">
-                          {staff.department?.department_name || 'Unassigned'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">
-                        {staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'N/A'}
-                      </td>
-                      <td className="px-5 py-3.5 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleViewDocument(staff)}
-                          disabled={viewingDocId === staff.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs transition-colors"
-                        >
-                          {viewingDocId === staff.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5" />
-                          )}
-                          <span>View Document</span>
-                        </button>
-                      </td>
-                      <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => handleApproveStaff(staff.id)}
-                          disabled={processingStaffId === staff.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
-                        >
-                          {processingStaffId === staff.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
-                          )}
-                          <span>Approve</span>
-                        </button>
+          {/* TAB 1: Complaint Moderation Queue */}
+          {adminTab === 'moderation' && (
+            <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+              <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-foreground">
+                      Complaint Moderation Queue
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground">
+                      Review civic reports awaiting Super Admin pre-moderation or citizen abuse flags
+                    </p>
+                  </div>
+                </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRejectStaff(staff.id)}
-                          disabled={processingStaffId === staff.id}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
-                        >
-                          {processingStaffId === staff.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <X className="w-3.5 h-3.5" />
-                          )}
-                          <span>Reject</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                    {moderationQueue.length} Pending Review
+                  </span>
+                  <button
+                    onClick={loadModerationQueue}
+                    disabled={isLoadingModeration}
+                    className="p-1.5 border border-input rounded-lg hover:bg-accent text-muted-foreground transition-colors"
+                    title="Refresh Moderation Queue"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingModeration ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {isLoadingModeration ? (
+                <div className="p-12 text-center text-xs text-muted-foreground">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
+                  Loading moderation queue...
+                </div>
+              ) : moderationQueue.length === 0 ? (
+                <div className="p-12 text-center text-xs text-muted-foreground space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <p className="font-semibold text-foreground">Moderation Queue is Clear</p>
+                  <p className="text-[11px]">There are no pending civic complaints or abuse flags waiting for review.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                      <tr>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Complaint Details</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Category & Dept</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">City</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Submitting Citizen</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Photo Evidence</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider text-right">Moderation Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {moderationQueue.map((c) => (
+                        <tr key={c.id} className="hover:bg-accent/30 transition-colors">
+                          <td className="px-5 py-3.5 max-w-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                                {c.tracking_number}
+                              </span>
+                              {c.is_flagged && (
+                                <span className="inline-flex items-center gap-1 font-semibold text-[10px] bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 rounded-full">
+                                  <Flag className="w-3 h-3" /> Flagged for Abuse
+                                </span>
+                              )}
+                            </div>
+                            <div className="font-semibold text-foreground text-sm mt-1">{c.title}</div>
+                            <p className="text-muted-foreground text-xs line-clamp-2 mt-0.5">
+                              {c.description}
+                            </p>
+                            {c.flag_reason && (
+                              <div className="mt-1.5 p-2 bg-destructive/5 border border-destructive/20 rounded text-[11px] text-destructive">
+                                <span className="font-semibold">Abuse Report:</span> {c.flag_reason}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="font-medium text-foreground">
+                              {c.category?.category_name || 'General'}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {c.department?.department_name || 'Municipal'}
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                              <MapPin className="w-3 h-3 text-primary" />
+                              {c.city || 'Karachi'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="font-medium text-foreground">
+                              {c.user?.name || 'Anonymous Citizen'}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {c.user?.email || 'No email provided'}
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            {c.image_url ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewComplaintImage({
+                                    url: c.image_url!,
+                                    title: c.title,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs transition-colors"
+                              >
+                                <ImageIcon className="w-3.5 h-3.5" />
+                                <span>Inspect Photo</span>
+                              </button>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px] italic">No image</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveComplaint(c.id)}
+                              disabled={processingComplaintId === c.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                            >
+                              {processingComplaintId === c.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              <span>Approve & Publish</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectingComplaint(c);
+                                setRejectionReason('');
+                              }}
+                              disabled={processingComplaintId === c.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>Reject</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: Staff Verification Requests */}
+          {adminTab === 'staff' && (
+            <div className="bg-card border border-border rounded-xl shadow-xs overflow-hidden">
+              <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-500/5">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-400 flex items-center justify-center">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-foreground">
+                      Staff Verification Requests
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground">
+                      Verify municipal employment credentials before granting authority portal access
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300">
+                    {pendingStaff.length} Pending Approval
+                  </span>
+                  <button
+                    onClick={loadPendingStaff}
+                    disabled={isLoadingStaff}
+                    className="p-1.5 border border-input rounded-lg hover:bg-accent text-muted-foreground transition-colors"
+                    title="Refresh Pending Staff"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingStaff ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
+
+              {isLoadingStaff ? (
+                <div className="p-12 text-center text-xs text-muted-foreground">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
+                  Loading pending staff requests...
+                </div>
+              ) : pendingStaff.length === 0 ? (
+                <div className="p-12 text-center text-xs text-muted-foreground space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <p className="font-semibold text-foreground">All Staff Requests Reviewed</p>
+                  <p className="text-[11px]">There are no pending municipal staff registrations awaiting identity verification.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                      <tr>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applicant Name</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">City Jurisdiction</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Requested Department</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applied Date</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider">ID Document</th>
+                        <th className="px-5 py-3 font-semibold uppercase tracking-wider text-right">Approval Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {pendingStaff.map((staff) => (
+                        <tr key={staff.id} className="hover:bg-accent/30 transition-colors">
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <div className="font-semibold text-foreground">{staff.name}</div>
+                            <div className="text-[11px] text-muted-foreground">{staff.email}</div>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 font-medium text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                              <MapPin className="w-3 h-3 text-primary" />
+                              {staff.city || 'Karachi (Default)'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <span className="font-medium text-primary">
+                              {staff.department?.department_name || 'Unassigned'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">
+                            {staff.created_at ? new Date(staff.created_at).toLocaleDateString() : 'N/A'}
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleViewDocument(staff)}
+                              disabled={viewingDocId === staff.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary font-semibold text-xs transition-colors"
+                            >
+                              {viewingDocId === staff.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
+                              <span>View Document</span>
+                            </button>
+                          </td>
+                          <td className="px-5 py-3.5 whitespace-nowrap text-right space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveStaff(staff.id)}
+                              disabled={processingStaffId === staff.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                            >
+                              {processingStaffId === staff.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Check className="w-3.5 h-3.5" />
+                              )}
+                              <span>Approve</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRejectStaff(staff.id)}
+                              disabled={processingStaffId === staff.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs shadow-xs transition-colors disabled:opacity-50"
+                            >
+                              {processingStaffId === staff.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <X className="w-3.5 h-3.5" />
+                              )}
+                              <span>Reject</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -610,7 +892,26 @@ export default function DashboardPage() {
                       {c.department?.department_name}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <StatusBadge status={c.status} size="sm" />
+                      <div className="flex flex-col gap-1 items-start">
+                        <StatusBadge status={c.status} size="sm" />
+                        {c.moderation_status === 'pending_review' && (
+                          <span className="inline-flex items-center gap-1 font-semibold text-[10px] bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                            <Clock className="w-3 h-3" /> Pending Review
+                          </span>
+                        )}
+                        {c.moderation_status === 'rejected' && (
+                          <div className="max-w-[140px]">
+                            <span className="inline-flex items-center gap-1 font-semibold text-[10px] bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 rounded-full">
+                              <XCircle className="w-3 h-3" /> Rejected
+                            </span>
+                            {c.moderation_reason && (
+                              <p className="text-[10px] text-destructive truncate mt-0.5" title={c.moderation_reason}>
+                                {c.moderation_reason}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <SlaBadge
@@ -628,7 +929,7 @@ export default function DashboardPage() {
                         Details
                       </Link>
 
-                      {(user.role === 'admin' || user.role === 'authority' || user.role === 'super_admin') && (
+                      {user.role === 'authority' && c.status !== 'Resolved' && c.status !== 'Rejected' && (
                         <button
                           onClick={() => {
                             setSelectedComplaint(c);
@@ -724,6 +1025,129 @@ export default function DashboardPage() {
                   <span>Approve & Grant Access</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complaint Photo Inspection Modal */}
+      {previewComplaintImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-2xl bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30">
+              <div>
+                <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-primary" />
+                  Photo Evidence Inspection
+                </h3>
+                <p className="text-[11px] text-muted-foreground line-clamp-1">
+                  {previewComplaintImage.title}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.open(previewComplaintImage.url, '_blank')}
+                  className="px-2.5 py-1 rounded-md text-xs font-medium text-foreground hover:bg-accent border border-input flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Full View</span>
+                </button>
+                <button
+                  onClick={() => setPreviewComplaintImage(null)}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-black/10 dark:bg-black/30">
+              <img
+                src={previewComplaintImage.url}
+                alt={previewComplaintImage.title}
+                className="max-h-[500px] max-w-full rounded-lg object-contain border border-border shadow-md"
+              />
+            </div>
+
+            <div className="p-4 border-t border-border flex items-center justify-between bg-card text-xs text-muted-foreground">
+              <span>Inspect image to verify civic authenticity before approving public listing.</span>
+              <button
+                type="button"
+                onClick={() => setPreviewComplaintImage(null)}
+                className="px-4 py-2 border border-input rounded-lg hover:bg-accent font-semibold text-xs text-foreground transition-colors"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complaint Rejection Reason Modal */}
+      {rejectingComplaint && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-destructive/5">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="font-bold text-sm text-foreground">
+                  Reject Complaint #{rejectingComplaint.tracking_number}
+                </h3>
+              </div>
+              <button
+                onClick={() => setRejectingComplaint(null)}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <p className="text-xs font-semibold text-foreground mb-1">
+                  Rejection Reason (Visible to Citizen) *
+                </p>
+                <p className="text-[11px] text-muted-foreground mb-2">
+                  Explain clearly why this complaint cannot be published (minimum 5 characters).
+                </p>
+                <textarea
+                  rows={4}
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="e.g. Duplicate report, insufficient detail, unrelated photo, issues not within municipal jurisdiction..."
+                  className="w-full text-xs bg-background border border-input rounded-lg p-3 text-foreground outline-none focus:ring-2 focus:ring-destructive/40 focus:border-destructive resize-none"
+                />
+                <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                  <span>Minimum 5 characters</span>
+                  <span>{rejectionReason.trim().length} chars</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex items-center justify-end gap-2 bg-muted/20">
+              <button
+                type="button"
+                onClick={() => setRejectingComplaint(null)}
+                disabled={processingComplaintId === rejectingComplaint.id}
+                className="px-4 py-2 border border-input rounded-lg hover:bg-accent font-semibold text-xs text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRejectComplaint(rejectingComplaint.id, rejectionReason)}
+                disabled={rejectionReason.trim().length < 5 || processingComplaintId === rejectingComplaint.id}
+                className="px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold text-xs rounded-lg shadow-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {processingComplaintId === rejectingComplaint.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <X className="w-4 h-4" />
+                )}
+                <span>Confirm Rejection</span>
+              </button>
             </div>
           </div>
         </div>
