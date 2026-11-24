@@ -46,7 +46,10 @@ export async function apiFetch<T>(
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const errorMsg = data?.message || data?.error || `HTTP error ${response.status}`;
+    let errorMsg = data?.message || data?.error || `HTTP error ${response.status}`;
+    if (response.status === 429) {
+      errorMsg = 'Too many attempts, please try again in 1 minute';
+    }
     const error: any = new Error(errorMsg);
     error.status = response.status;
     error.data = data;

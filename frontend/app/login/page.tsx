@@ -25,7 +25,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<{
-    type: 'pending' | 'rejected' | 'generic';
+    type: 'pending' | 'rejected' | 'rate_limit' | 'generic';
     message: string;
   } | null>(null);
 
@@ -40,23 +40,32 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err.message || 'Invalid email or password.';
-      if (msg.toLowerCase().includes('pending') || err.status === 403 && msg.includes('pending')) {
+      if (err.status === 429 || msg.toLowerCase().includes('too many') || msg.includes('429')) {
+        const rateLimitMsg = 'Too many attempts, please try again in 1 minute';
+        setAuthError({
+          type: 'rate_limit',
+          message: rateLimitMsg,
+        });
+        toast.error(rateLimitMsg);
+      } else if (msg.toLowerCase().includes('pending') || err.status === 403 && msg.includes('pending')) {
         setAuthError({
           type: 'pending',
           message: 'Your municipal staff account is pending Super Admin approval. Please wait for administrative verification.',
         });
+        toast.error(msg);
       } else if (msg.toLowerCase().includes('rejected') || err.status === 403 && msg.includes('rejected')) {
         setAuthError({
           type: 'rejected',
           message: 'Your staff registration request was rejected by the Super Admin.',
         });
+        toast.error(msg);
       } else {
         setAuthError({
           type: 'generic',
           message: msg,
         });
+        toast.error(msg);
       }
-      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -74,23 +83,32 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: any) {
       const msg = err.message || 'Failed to sign in with demo credentials.';
-      if (msg.includes('pending')) {
+      if (err.status === 429 || msg.toLowerCase().includes('too many') || msg.includes('429')) {
+        const rateLimitMsg = 'Too many attempts, please try again in 1 minute';
+        setAuthError({
+          type: 'rate_limit',
+          message: rateLimitMsg,
+        });
+        toast.error(rateLimitMsg);
+      } else if (msg.includes('pending')) {
         setAuthError({
           type: 'pending',
           message: 'Your municipal staff account is pending Super Admin approval.',
         });
+        toast.error(msg);
       } else if (msg.includes('rejected')) {
         setAuthError({
           type: 'rejected',
           message: 'Your staff registration request was rejected.',
         });
+        toast.error(msg);
       } else {
         setAuthError({
           type: 'generic',
           message: msg,
         });
+        toast.error(msg);
       }
-      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -115,14 +133,12 @@ export default function LoginPage() {
         {authError && (
           <div
             className={`p-3.5 rounded-xl text-xs flex items-start gap-2.5 border transition-all ${
-              authError.type === 'pending'
+              authError.type === 'pending' || authError.type === 'rate_limit'
                 ? 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'
-                : authError.type === 'rejected'
-                ? 'bg-destructive/10 border-destructive/30 text-destructive'
                 : 'bg-destructive/10 border-destructive/30 text-destructive'
             }`}
           >
-            {authError.type === 'pending' ? (
+            {authError.type === 'pending' || authError.type === 'rate_limit' ? (
               <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             ) : authError.type === 'rejected' ? (
               <XCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
@@ -133,6 +149,8 @@ export default function LoginPage() {
               <span className="font-bold block">
                 {authError.type === 'pending'
                   ? 'Registration Pending Approval'
+                  : authError.type === 'rate_limit'
+                  ? 'Too Many Attempts'
                   : authError.type === 'rejected'
                   ? 'Application Rejected'
                   : 'Authentication Error'}
