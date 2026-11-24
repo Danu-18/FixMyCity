@@ -104,6 +104,27 @@ export async function apiResendVerification(
   });
 }
 
+export async function apiForgotPassword(
+  email: string
+): Promise<{ message: string; email: string }> {
+  return apiFetch('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function apiResetPassword(data: {
+  email: string;
+  code: string;
+  password: string;
+  password_confirmation: string;
+}): Promise<{ message: string }> {
+  return apiFetch('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function apiGetMe(): Promise<{ user: User }> {
   return apiFetch('/auth/me');
 }

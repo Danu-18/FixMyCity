@@ -67,6 +67,11 @@ export default function DashboardPage() {
   const [previewComplaintImage, setPreviewComplaintImage] = useState<{ url: string; title: string } | null>(null);
   const [rejectingComplaint, setRejectingComplaint] = useState<Complaint | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string>('');
+  const [activeRejectionModal, setActiveRejectionModal] = useState<{
+    tracking: string;
+    title: string;
+    reason: string;
+  } | null>(null);
 
   const [pendingStaff, setPendingStaff] = useState<User[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState<boolean>(false);
@@ -186,12 +191,16 @@ export default function DashboardPage() {
       setProcessingComplaintId(complaintId);
       const res = await apiRejectComplaint(complaintId, reason.trim());
       toast.success(res.message || 'Complaint rejected by moderation.');
-      setModerationQueue((prev) => prev.filter((c) => c.id !== complaintId));
       setRejectingComplaint(null);
       setRejectionReason('');
       if (previewComplaintImage) {
         setPreviewComplaintImage(null);
       }
+      // Immediately refresh moderation queue, city complaints registry, and analytics
+      await Promise.all([
+        loadModerationQueue(),
+        loadDashboardData(),
+      ]);
     } catch (err: any) {
       toast.error(err.message || 'Failed to reject complaint.');
     } finally {
@@ -893,31 +902,51 @@ export default function DashboardPage() {
                       {c.department?.department_name}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-start">
-                        <StatusBadge status={c.status} size="sm" />
-                        {c.moderation_status === 'pending_review' && (
-                          <span className="inline-flex items-center gap-1 font-semibold text-[10px] bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full">
-                            <Clock className="w-3 h-3" /> Pending Review
-                          </span>
-                        )}
-                        {c.moderation_status === 'rejected' && (
-                          <div className="max-w-[140px]">
-                            <span className="inline-flex items-center gap-1 font-semibold text-[10px] bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 rounded-full">
-                              <XCircle className="w-3 h-3" /> Rejected
-                            </span>
-                            {c.moderation_reason && (
-                              <p className="text-[10px] text-destructive truncate mt-0.5" title={c.moderation_reason}>
-                                {c.moderation_reason}
-                              </p>
+                      {(() => {
+                        const isRejected = c.status === 'Rejected' || c.moderation_status === 'rejected';
+                        const isPendingReview = !isRejected && c.moderation_status === 'pending_review';
+                        const displayStatus = isRejected ? 'Rejected' : isPendingReview ? 'Pending Review' : c.status;
+
+                        return (
+                          <div className="flex flex-col gap-1 items-start max-w-[180px]">
+                            <StatusBadge status={displayStatus} size="sm" />
+
+                            {isRejected && c.moderation_reason && (
+                              <div className="mt-0.5 w-full">
+                                {c.moderation_reason.length > 35 ? (
+                                  <div className="text-[10px] leading-tight text-destructive">
+                                    <span className="line-clamp-1 break-words italic">
+                                      {c.moderation_reason.slice(0, 32)}...
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setActiveRejectionModal({
+                                          tracking: c.tracking_number,
+                                          title: c.title,
+                                          reason: c.moderation_reason!,
+                                        })
+                                      }
+                                      className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-destructive underline hover:text-destructive/80 transition-colors cursor-pointer"
+                                    >
+                                      Read more
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <p className="text-[10px] text-destructive italic leading-tight">
+                                    {c.moderation_reason}
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <SlaBadge
                         deadline={c.sla_deadline}
-                        status={c.status}
+                        status={c.status === 'Rejected' || c.moderation_status === 'rejected' ? 'Rejected' : c.status}
                         isBreached={c.is_sla_breached}
                       />
                     </td>
@@ -1235,6 +1264,60 @@ export default function DashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Complaint Rejection Reason Inspection Modal */}
+      {activeRejectionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-150">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-destructive/5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-destructive/15 text-destructive flex items-center justify-center">
+                  <XCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Rejection Reason</h3>
+                  <p className="text-[11px] font-mono text-muted-foreground">#{activeRejectionModal.tracking}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveRejectionModal(null)}
+                className="p-1 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5">
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Complaint Title
+                </span>
+                <p className="text-sm font-semibold text-foreground mt-0.5">{activeRejectionModal.title}</p>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Moderator Notes & Reason
+                </span>
+                <div className="mt-1.5 p-3.5 bg-destructive/10 border border-destructive/20 rounded-xl text-xs text-destructive leading-relaxed whitespace-pre-wrap break-words">
+                  {activeRejectionModal.reason}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 border-t border-border bg-muted/20 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveRejectionModal(null)}
+                className="px-4 py-1.5 rounded-lg bg-muted hover:bg-accent text-foreground text-xs font-semibold transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

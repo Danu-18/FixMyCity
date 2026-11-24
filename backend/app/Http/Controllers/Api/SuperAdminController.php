@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use App\Models\Notification;
+use App\Models\StatusHistory;
 use App\Models\User;
 use App\Services\ComplaintNotificationService;
 use App\Services\ComplaintRoutingEngine;
@@ -126,6 +127,7 @@ class SuperAdminController extends Controller
             'moderated_by' => $request->user()->id,
             'moderated_at' => now(),
             'sla_deadline' => $routing['sla_deadline'],
+            'status' => 'Pending',
         ]);
 
         // Centralized citizen + matching city authority notification & email dispatch
@@ -151,7 +153,10 @@ class SuperAdminController extends Controller
             'reason' => 'required|string|min:5|max:1000',
         ]);
 
+        $oldStatus = $complaint->status;
+
         $complaint->update([
+            'status' => 'Rejected',
             'moderation_status' => 'rejected',
             'moderation_reason' => $validated['reason'],
             'is_flagged' => false,
@@ -159,12 +164,22 @@ class SuperAdminController extends Controller
             'moderated_at' => now(),
         ]);
 
+        // Record status history for rejection
+        StatusHistory::create([
+            'complaint_id' => $complaint->id,
+            'old_status' => $oldStatus,
+            'new_status' => 'Rejected',
+            'changed_by' => $request->user()->id,
+            'notes' => "Complaint rejected during moderation: {$validated['reason']}",
+            'changed_at' => Carbon::now(),
+        ]);
+
         // Centralized citizen rejection notification & email dispatch
         $notificationService->notifyComplaintModerationRejected($complaint, $validated['reason']);
 
         return response()->json([
             'message' => 'Complaint has been rejected.',
-            'complaint' => $complaint->fresh(['department', 'category', 'user', 'moderator']),
+            'complaint' => $complaint->fresh(['department', 'category', 'user', 'moderator', 'statusHistory']),
         ]);
     }
 }

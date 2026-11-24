@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Mail\CitizenVerificationCodeMail;
 use App\Mail\ComplaintLifecycleMail;
+use App\Mail\PasswordResetCodeMail;
 use App\Models\Category;
 use App\Models\Complaint;
 use App\Models\Department;
@@ -37,6 +38,7 @@ class FixMyCityApiTest extends TestCase
     {
         $response = $this->getJson('/api/departments');
         $response->assertStatus(200);
+
         $response->assertJsonStructure([
             '*' => ['id', 'department_name', 'contact_email', 'sla_hours', 'total_complaints'],
         ]);
@@ -56,6 +58,7 @@ class FixMyCityApiTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+
         $response->assertJsonStructure(['token', 'user']);
 
         $token = $response->json('token');
@@ -651,6 +654,7 @@ class FixMyCityApiTest extends TestCase
             ]);
         $validReject->assertStatus(200);
         $this->assertEquals('rejected', $validReject->json('complaint.moderation_status'));
+        $this->assertEquals('Rejected', $validReject->json('complaint.status'));
         $this->assertStringContainsString('police jurisdiction', $validReject->json('complaint.moderation_reason'));
 
         // 5. Remains hidden from public
@@ -892,6 +896,7 @@ class FixMyCityApiTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+
         $response->assertJsonStructure(['message', 'user', 'token']);
         $this->assertNotEmpty($response->json('token'));
         $this->assertEquals('validotp@example.com', $response->json('user.email'));
@@ -929,6 +934,7 @@ class FixMyCityApiTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+
         $response->assertJsonPath('requires_verification', true);
         $response->assertJsonPath('email', 'resendotp@example.com');
         $this->assertStringContainsString('fresh 6-digit verification code', $response->json('message'));
@@ -1092,6 +1098,7 @@ class FixMyCityApiTest extends TestCase
 
         $response->assertStatus(200);
 
+
         // Assert ComplaintLifecycleMail sent to citizen
         Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen) {
             return $mail->hasTo($citizen->email) && $mail->stage === 'approved';
@@ -1157,6 +1164,8 @@ class FixMyCityApiTest extends TestCase
             ]);
 
         $response->assertStatus(200);
+        $this->assertEquals('Rejected', $complaint->fresh()->status);
+        $this->assertEquals('rejected', $complaint->fresh()->moderation_status);
 
         // Assert ComplaintLifecycleMail sent with reason
         Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen, $rejectionReason) {
@@ -1210,6 +1219,7 @@ class FixMyCityApiTest extends TestCase
 
         $response->assertStatus(200);
 
+
         // Assert ComplaintLifecycleMail sent with Resolved stage
         Mail::assertSent(ComplaintLifecycleMail::class, function ($mail) use ($citizen, $resolutionNotes) {
             return $mail->hasTo($citizen->email) && $mail->stage === 'resolved' && $mail->remarks === $resolutionNotes;
@@ -1220,5 +1230,132 @@ class FixMyCityApiTest extends TestCase
         $this->assertNotNull($notif);
         $this->assertStringContainsString('Resolved', $notif->title);
         $this->assertStringContainsString($resolutionNotes, $notif->message);
+    }
+
+    public function test_forgot_password_sends_email_with_6_digit_otp_and_stores_hash(): void
+    {
+        $user = User::create([
+            'name' => 'Forgot Password Citizen',
+            'email' => 'forgot.citizen@fixmycity.org',
+            'password' => Hash::make('oldpassword123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->postJson('/api/forgot-password', [
+            'email' => 'forgot.citizen@fixmycity.org',
+        ]);
+
+        $response->assertStatus(200);
+
+        $this->assertStringContainsString('6-digit password reset code', $response->json('message'));
+
+        $freshUser = $user->fresh();
+        $this->assertNotNull($freshUser->password_reset_code);
+        $this->assertNotNull($freshUser->password_reset_expires_at);
+        $this->assertTrue(now()->isBefore($freshUser->password_reset_expires_at));
+
+        Mail::assertSent(PasswordResetCodeMail::class, function ($mail) {
+            return $mail->hasTo('forgot.citizen@fixmycity.org');
+        });
+    }
+
+    public function test_forgot_password_with_unknown_email_returns_404(): void
+    {
+        $response = $this->postJson('/api/forgot-password', [
+            'email' => 'unknown.nobody@fixmycity.org',
+        ]);
+
+        $response->assertStatus(404);
+        $this->assertStringContainsString('No account found', $response->json('message'));
+    }
+
+    public function test_reset_password_with_wrong_or_expired_code_is_rejected(): void
+    {
+        $user = User::create([
+            'name' => 'Reset Test User',
+            'email' => 'reset.test@fixmycity.org',
+            'password' => Hash::make('initialpass123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => now(),
+            'password_reset_code' => Hash::make('123456'),
+            'password_reset_expires_at' => now()->addMinutes(15),
+        ]);
+
+        // Wrong OTP code
+        $wrongResponse = $this->postJson('/api/reset-password', [
+            'email' => 'reset.test@fixmycity.org',
+            'code' => '999999',
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ]);
+
+        $wrongResponse->assertStatus(422);
+        $this->assertEquals('Invalid or expired password reset code.', $wrongResponse->json('message'));
+        $this->assertTrue(Hash::check('initialpass123', $user->fresh()->password));
+
+        // Expired OTP code
+        $user->update([
+            'password_reset_expires_at' => now()->subMinute(),
+        ]);
+
+        $expiredResponse = $this->postJson('/api/reset-password', [
+            'email' => 'reset.test@fixmycity.org',
+            'code' => '123456',
+            'password' => 'newpassword123',
+            'password_confirmation' => 'newpassword123',
+        ]);
+
+        $expiredResponse->assertStatus(422);
+        $this->assertEquals('Invalid or expired password reset code.', $expiredResponse->json('message'));
+    }
+
+    public function test_reset_password_with_valid_otp_updates_password_and_permits_login(): void
+    {
+        $user = User::create([
+            'name' => 'Valid Reset User',
+            'email' => 'valid.reset@fixmycity.org',
+            'password' => Hash::make('oldpass123'),
+            'role' => 'citizen',
+            'status' => 'active',
+            'email_verified_at' => now(),
+            'password_reset_code' => Hash::make('654321'),
+            'password_reset_expires_at' => now()->addMinutes(15),
+        ]);
+
+        $response = $this->postJson('/api/reset-password', [
+            'email' => 'valid.reset@fixmycity.org',
+            'code' => '654321',
+            'password' => 'brandnewpass123',
+            'password_confirmation' => 'brandnewpass123',
+        ]);
+
+        $response->assertStatus(200);
+
+        $this->assertStringContainsString('successfully reset', $response->json('message'));
+
+        $freshUser = $user->fresh();
+        $this->assertNull($freshUser->password_reset_code);
+        $this->assertNull($freshUser->password_reset_expires_at);
+        $this->assertTrue(Hash::check('brandnewpass123', $freshUser->password));
+
+        // Attempt login with old password -> fail
+        app('auth')->forgetGuards();
+        $failLogin = $this->postJson('/api/login', [
+            'email' => 'valid.reset@fixmycity.org',
+            'password' => 'oldpass123',
+        ]);
+        $failLogin->assertStatus(422);
+
+        // Attempt login with new password -> success
+        app('auth')->forgetGuards();
+        $successLogin = $this->postJson('/api/login', [
+            'email' => 'valid.reset@fixmycity.org',
+            'password' => 'brandnewpass123',
+        ]);
+        $successLogin->assertStatus(200);
+        $this->assertNotEmpty($successLogin->json('token'));
     }
 }

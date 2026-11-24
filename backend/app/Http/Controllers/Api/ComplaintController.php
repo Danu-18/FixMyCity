@@ -311,6 +311,12 @@ class ComplaintController extends Controller
             ], 403);
         }
 
+        if ($complaint->moderation_status !== 'approved') {
+            return response()->json([
+                'message' => 'Operational resolution is only available for complaints that have been approved through moderation review.',
+            ], 422);
+        }
+
         $validated = $request->validate([
             'status' => 'required|string|in:Pending,In Progress,Resolved,Rejected',
             'notes' => 'nullable|string|max:1000',

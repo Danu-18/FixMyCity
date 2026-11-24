@@ -32,6 +32,13 @@ export function StatusBadge({ status, className = '', size = 'md' }: StatusBadge
           Rejected
         </span>
       );
+    case 'Pending Review':
+      return (
+        <span className={`inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 font-semibold ${sizeClasses} ${className}`}>
+          <Clock className="w-3 h-3" />
+          Pending Review
+        </span>
+      );
     case 'Pending':
     default:
       return (

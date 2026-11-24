@@ -294,17 +294,12 @@ function ComplaintDetailContent() {
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div className="flex flex-wrap items-center gap-2">
                 <PriorityBadge priority={complaint.priority} />
-                <StatusBadge status={complaint.status} />
-                {complaint.moderation_status === 'pending_review' && (
-                  <span className="inline-flex items-center gap-1 font-semibold text-xs bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
-                    <Clock className="w-3.5 h-3.5" /> Pending Moderation
-                  </span>
-                )}
-                {complaint.moderation_status === 'rejected' && (
-                  <span className="inline-flex items-center gap-1 font-semibold text-xs bg-destructive/10 text-destructive border border-destructive/20 px-2.5 py-0.5 rounded-full">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Moderation Rejected
-                  </span>
-                )}
+                {(() => {
+                  const isRejected = complaint.status === 'Rejected' || complaint.moderation_status === 'rejected';
+                  const isPendingReview = !isRejected && complaint.moderation_status === 'pending_review';
+                  const displayStatus = isRejected ? 'Rejected' : isPendingReview ? 'Pending Review' : complaint.status;
+                  return <StatusBadge status={displayStatus} />;
+                })()}
                 {complaint.is_flagged && (
                   <span className="inline-flex items-center gap-1 font-semibold text-xs bg-destructive/10 text-destructive border border-destructive/20 px-2.5 py-0.5 rounded-full">
                     <Flag className="w-3.5 h-3.5" /> Flagged for Review
@@ -313,7 +308,7 @@ function ComplaintDetailContent() {
               </div>
               <SlaBadge
                 deadline={complaint.sla_deadline}
-                status={complaint.status}
+                status={complaint.status === 'Rejected' || complaint.moderation_status === 'rejected' ? 'Rejected' : complaint.status}
                 isBreached={complaint.is_sla_breached}
               />
             </div>
