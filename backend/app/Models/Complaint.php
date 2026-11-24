@@ -102,10 +102,17 @@ class Complaint extends Model
         if (!$this->image_path) {
             return null;
         }
-        if (str_starts_with($this->image_path, 'http')) {
+        if (str_starts_with($this->image_path, 'http://') || str_starts_with($this->image_path, 'https://')) {
             return $this->image_path;
         }
-        return url('storage/' . $this->image_path);
+        
+        $root = request()->root();
+        if ($root && !str_contains($root, 'localhost:80') && $root !== 'http://localhost') {
+            return rtrim($root, '/') . '/storage/' . ltrim($this->image_path, '/');
+        }
+        
+        $appUrl = config('app.url', 'http://localhost:8000');
+        return rtrim($appUrl, '/') . '/storage/' . ltrim($this->image_path, '/');
     }
 
     public function getResolutionImageUrlAttribute(): ?string
@@ -113,9 +120,16 @@ class Complaint extends Model
         if (!$this->resolution_image) {
             return null;
         }
-        if (str_starts_with($this->resolution_image, 'http')) {
+        if (str_starts_with($this->resolution_image, 'http://') || str_starts_with($this->resolution_image, 'https://')) {
             return $this->resolution_image;
         }
-        return url('storage/' . $this->resolution_image);
+        
+        $root = request()->root();
+        if ($root && !str_contains($root, 'localhost:80') && $root !== 'http://localhost') {
+            return rtrim($root, '/') . '/storage/' . ltrim($this->resolution_image, '/');
+        }
+        
+        $appUrl = config('app.url', 'http://localhost:8000');
+        return rtrim($appUrl, '/') . '/storage/' . ltrim($this->resolution_image, '/');
     }
 }

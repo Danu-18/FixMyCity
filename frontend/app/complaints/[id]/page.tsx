@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { getComplaintImageUrl } from '@/lib/utils';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), {
   ssr: false,
@@ -440,11 +441,17 @@ function ComplaintDetailContent() {
                   <ImageIcon className="w-4 h-4 text-primary" />
                   Citizen Uploaded Photo Evidence:
                 </h3>
-                <div className="rounded-xl overflow-hidden border border-border max-h-96 bg-muted">
+                <div className="rounded-xl overflow-hidden border border-border max-h-96 bg-muted flex items-center justify-center">
                   <img
-                    src={complaint.image_url}
+                    src={getComplaintImageUrl(complaint.image_url) || complaint.image_url}
                     alt={complaint.title}
                     className="w-full h-auto object-contain max-h-96"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.includes(':8000') && target.src.includes('localhost/storage/')) {
+                        target.src = target.src.replace('localhost/storage/', 'localhost:8000/storage/');
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -477,9 +484,15 @@ function ComplaintDetailContent() {
                     Completion Verification Photo:
                   </p>
                   <img
-                    src={complaint.resolution_image_url}
+                    src={getComplaintImageUrl(complaint.resolution_image_url) || complaint.resolution_image_url}
                     alt="Resolution evidence"
                     className="rounded-lg max-h-48 object-cover border border-border"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (!target.src.includes(':8000') && target.src.includes('localhost/storage/')) {
+                        target.src = target.src.replace('localhost/storage/', 'localhost:8000/storage/');
+                      }
+                    }}
                   />
                 </div>
               )}

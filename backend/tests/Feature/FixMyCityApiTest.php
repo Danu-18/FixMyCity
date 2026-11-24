@@ -22,6 +22,12 @@ class FixMyCityApiTest extends TestCase
         $this->artisan('db:seed');
     }
 
+    protected function createFakeImage(string $name = 'incident.png'): UploadedFile
+    {
+        $onePixelPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+        return UploadedFile::fake()->createWithContent($name, $onePixelPng);
+    }
+
     public function test_departments_and_categories_endpoints_return_data(): void
     {
         $response = $this->getJson('/api/departments');
@@ -58,10 +64,13 @@ class FixMyCityApiTest extends TestCase
 
     public function test_automated_complaint_routing_to_department(): void
     {
+        Storage::fake('public');
         $category = Category::where('category_name', 'Damaged Road / Pothole')->first();
         $this->assertNotNull($category);
 
-        $submitResponse = $this->postJson('/api/complaints', [
+        $file = $this->createFakeImage('road_damage.png');
+
+        $submitResponse = $this->post('/api/complaints', [
             'title' => 'Test Road Damage on Clifton Expressway',
             'description' => 'Massive ditch opened up in middle lane.',
             'category_id' => $category->id,
@@ -70,7 +79,8 @@ class FixMyCityApiTest extends TestCase
             'longitude' => 67.032,
             'address' => 'Clifton Expressway, Karachi',
             'priority' => 'High',
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
 
         $submitResponse->assertStatus(201);
         $complaintData = $submitResponse->json('complaint');
@@ -419,58 +429,65 @@ class FixMyCityApiTest extends TestCase
 
     public function test_content_moderation_blocks_profanity_and_spam(): void
     {
+        Storage::fake('public');
         $category = Category::first();
+        $file = $this->createFakeImage('proof.png');
 
         // 1. English profanity
-        $profaneResp = $this->postJson('/api/complaints', [
+        $profaneResp = $this->post('/api/complaints', [
             'title' => 'Fix this fuck road immediately',
             'description' => 'The entire street is ruined and you people are doing nothing.',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.86,
             'longitude' => 67.00,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
         $profaneResp->assertStatus(422);
         $this->assertStringContainsString('inappropriate language', $profaneResp->json('message'));
 
         // 2. Obfuscated Roman Urdu slur
-        $obfuscatedResp = $this->postJson('/api/complaints', [
+        $obfuscatedResp = $this->post('/api/complaints', [
             'title' => 'Pothole issue on main boulevard',
             'description' => 'Ye sub k.a.m.i.n.a log hain koi kaam nahi karta yahan.',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.86,
             'longitude' => 67.00,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
         $obfuscatedResp->assertStatus(422);
         $this->assertStringContainsString('inappropriate language', $obfuscatedResp->json('message'));
 
         // 3. Spam / Repeated characters
-        $spamResp = $this->postJson('/api/complaints', [
+        $spamResp = $this->post('/api/complaints', [
             'title' => 'aaaaaaa',
             'description' => 'aaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.86,
             'longitude' => 67.00,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
         $spamResp->assertStatus(422);
         $this->assertStringContainsString('inappropriate language or invalid text', $spamResp->json('message'));
 
         // 4. Gibberish / Mashed keys
-        $gibberishResp = $this->postJson('/api/complaints', [
+        $gibberishResp = $this->post('/api/complaints', [
             'title' => 'zxvbnm',
             'description' => 'qwrtypsdfghjklzxcvbnm test',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.86,
             'longitude' => 67.00,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
         $gibberishResp->assertStatus(422);
     }
 
     public function test_clean_complaint_lands_in_pending_review_and_is_hidden_from_public_and_authority(): void
     {
+        Storage::fake('public');
         $citizen = User::where('role', 'citizen')->first();
         $this->assertNotNull($citizen);
 
@@ -481,17 +498,19 @@ class FixMyCityApiTest extends TestCase
         $citizenToken = $citizenLogin->json('token');
 
         $category = Category::first();
+        $file = $this->createFakeImage('pipe_burst.png');
 
-        // 1. Citizen submits valid clean complaint
+        // 1. Citizen submits valid clean complaint with image
         $submitResp = $this->withHeader('Authorization', "Bearer {$citizenToken}")
-            ->postJson('/api/complaints', [
+            ->post('/api/complaints', [
                 'title' => 'Broken Water Pipe Flooding Gulberg Main Road',
                 'description' => 'Fresh water is gushing out continuously and flooding the road near Block 3.',
                 'category_id' => $category->id,
                 'city' => 'Karachi',
                 'latitude' => 24.912,
                 'longitude' => 67.078,
-            ]);
+                'image' => $file,
+            ], ['Accept' => 'application/json']);
 
         $submitResp->assertStatus(201);
         $complaintId = $submitResp->json('complaint.id');
@@ -534,17 +553,20 @@ class FixMyCityApiTest extends TestCase
 
     public function test_super_admin_moderation_queue_and_approval_workflow(): void
     {
+        Storage::fake('public');
         $category = Category::where('category_name', 'Damaged Road / Pothole')->first();
+        $file = $this->createFakeImage('pothole.png');
 
         // 1. Submit a complaint that lands in pending_review
-        $submit = $this->postJson('/api/complaints', [
+        $submit = $this->post('/api/complaints', [
             'title' => 'Deep pothole outside school gate in Karachi',
             'description' => 'Children are at danger due to this severe trench outside the main campus.',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.85,
             'longitude' => 67.02,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
         $submit->assertStatus(201);
         $complaintId = $submit->json('complaint.id');
 
@@ -586,17 +608,21 @@ class FixMyCityApiTest extends TestCase
 
     public function test_super_admin_rejects_complaint_with_reason(): void
     {
+        Storage::fake('public');
         $category = Category::first();
+        $file = $this->createFakeImage('unauthorized_vehicle.png');
 
         // 1. Submit a complaint
-        $submit = $this->postJson('/api/complaints', [
+        $submit = $this->post('/api/complaints', [
             'title' => 'Suspicious vehicle parked on sidewalk for two weeks',
             'description' => 'Unidentified car blocking the pedestrian walkway continuously.',
             'category_id' => $category->id,
             'city' => 'Karachi',
             'latitude' => 24.85,
             'longitude' => 67.02,
-        ]);
+            'image' => $file,
+        ], ['Accept' => 'application/json']);
+        $submit->assertStatus(201);
         $complaintId = $submit->json('complaint.id');
 
         // 2. Super Admin logs in
@@ -727,5 +753,26 @@ class FixMyCityApiTest extends TestCase
 
         $resolveUpdate->assertStatus(200);
         $this->assertEquals('Resolved', $resolveUpdate->json('complaint.status'));
+    }
+
+    public function test_complaint_cannot_be_submitted_without_image_upload(): void
+    {
+        $category = Category::first();
+        $this->assertNotNull($category);
+
+        $response = $this->postJson('/api/complaints', [
+            'title' => 'Open Drain on Shahrah-e-Faisal',
+            'description' => 'A large stormwater drain is missing its grate creating hazard.',
+            'category_id' => $category->id,
+            'city' => 'Karachi',
+            'latitude' => 24.87,
+            'longitude' => 67.06,
+            'priority' => 'High',
+            // No image provided
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['image']);
+        $this->assertEquals('The image field is required.', $response->json('errors.image.0'));
     }
 }

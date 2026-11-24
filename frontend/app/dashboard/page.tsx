@@ -48,6 +48,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import { getComplaintImageUrl } from '@/lib/utils';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -650,7 +651,7 @@ export default function DashboardPage() {
                                 type="button"
                                 onClick={() =>
                                   setPreviewComplaintImage({
-                                    url: c.image_url!,
+                                    url: getComplaintImageUrl(c.image_url) || c.image_url!,
                                     title: c.title,
                                   })
                                 }
@@ -1063,11 +1064,17 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-black/10 dark:bg-black/30">
+            <div className="p-4 overflow-auto flex-1 flex items-center justify-center bg-black/10 dark:bg-black/30 min-h-[240px]">
               <img
                 src={previewComplaintImage.url}
                 alt={previewComplaintImage.title}
                 className="max-h-[500px] max-w-full rounded-lg object-contain border border-border shadow-md"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (!target.src.includes(':8000') && target.src.includes('localhost/storage/')) {
+                    target.src = target.src.replace('localhost/storage/', 'localhost:8000/storage/');
+                  }
+                }}
               />
             </div>
 

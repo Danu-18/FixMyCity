@@ -316,6 +316,10 @@ export default function ReportComplaintPage() {
       toast.warn('Please select or specify the municipal city for this complaint.');
       return;
     }
+    if (!imageFile) {
+      toast.warn('Photo evidence is mandatory. Please upload an image of the civic problem before submitting.');
+      return;
+    }
 
     setIsSubmitting(true);
     setModerationError(null);
@@ -563,13 +567,23 @@ export default function ReportComplaintPage() {
 
           {/* Photo Evidence Upload */}
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
-              Photo Evidence (Recommended)
+            <label className="block text-xs font-semibold text-foreground mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Camera className="w-3.5 h-3.5 text-primary" />
+                Photo Evidence (Mandatory) *
+              </span>
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                Visual proof is required to verify the issue
+              </span>
             </label>
             <div className="mt-1 flex flex-col sm:flex-row items-center gap-4">
-              <label className="w-full sm:w-auto cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-dashed border-input rounded-xl text-xs font-medium text-foreground hover:border-primary hover:bg-accent transition-colors">
+              <label className={`w-full sm:w-auto cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 border rounded-xl text-xs font-medium transition-colors ${
+                imageFile
+                  ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                  : 'border-dashed border-input text-foreground hover:border-primary hover:bg-accent'
+              }`}>
                 <Camera className="w-4 h-4 text-primary" />
-                <span>Upload Incident Photo</span>
+                <span>{imageFile ? 'Change Incident Photo' : 'Upload Incident Photo *'}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -577,15 +591,19 @@ export default function ReportComplaintPage() {
                   className="hidden"
                 />
               </label>
-              {imageFile && (
-                <span className="text-xs text-muted-foreground">
-                  {imageFile.name} ({(imageFile.size / 1024).toFixed(1)} KB)
+              {imageFile ? (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                  ✓ {imageFile.name} ({(imageFile.size / 1024).toFixed(1)} KB)
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  No image selected yet (required)
                 </span>
               )}
             </div>
 
             {imagePreview && (
-              <div className="mt-3 relative w-48 h-32 rounded-xl overflow-hidden border border-border">
+              <div className="mt-3 relative w-48 h-32 rounded-xl overflow-hidden border border-border shadow-xs">
                 <img
                   src={imagePreview}
                   alt="Preview"

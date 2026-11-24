@@ -7,10 +7,11 @@ import { Complaint } from '@/lib/types';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { SlaBadge } from './SlaBadge';
-import { ThumbsUp, MapPin, Building2, Clock, MessageSquare } from 'lucide-react';
+import { ThumbsUp, MapPin, Building2, Clock, MessageSquare, ImageIcon } from 'lucide-react';
 import { apiToggleUpvote } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'react-toastify';
+import { getComplaintImageUrl } from '@/lib/utils';
 
 interface ComplaintCardProps {
   complaint: Complaint;
@@ -23,6 +24,9 @@ export function ComplaintCard({ complaint, onUpvoteChange }: ComplaintCardProps)
   const [upvotes, setUpvotes] = useState<number>(complaint.upvotes_count || 0);
   const [hasUpvoted, setHasUpvoted] = useState<boolean>(complaint.has_upvoted || false);
   const [isVoting, setIsVoting] = useState<boolean>(false);
+  const [imageError, setImageError] = useState<boolean>(false);
+
+  const resolvedImageUrl = getComplaintImageUrl(complaint.image_url);
 
   const handleUpvote = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -87,17 +91,20 @@ export function ComplaintCard({ complaint, onUpvoteChange }: ComplaintCardProps)
           {complaint.description}
         </p>
 
-        {/* Thumbnail Preview if Photo Attached */}
-        {complaint.image_url && (
-          <div className="mt-3 relative h-28 w-full overflow-hidden rounded-lg border border-border bg-muted/40">
+        {/* Thumbnail Preview */}
+        {resolvedImageUrl && !imageError ? (
+          <div className="mt-3 relative h-36 w-full overflow-hidden rounded-lg border border-border bg-muted/40 group">
             <img
-              src={complaint.image_url}
+              src={resolvedImageUrl}
               alt={complaint.title}
-              className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={() => setImageError(true)}
             />
+          </div>
+        ) : (
+          <div className="mt-3 relative h-20 w-full rounded-lg border border-dashed border-border bg-muted/20 flex items-center justify-center gap-2 text-muted-foreground text-[11px]">
+            <ImageIcon className="w-4 h-4 text-muted-foreground/60" />
+            <span>Civic Issue Evidence Photo</span>
           </div>
         )}
 

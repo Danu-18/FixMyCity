@@ -201,7 +201,7 @@ class ComplaintController extends Controller
             'longitude' => 'required|numeric|between:-180,180',
             'address' => 'nullable|string|max:255',
             'priority' => 'nullable|string|in:Low,Medium,High,Urgent',
-            'image' => 'nullable|image|max:10240', // 10MB max
+            'image' => 'required|image|max:10240', // Mandatory photo evidence (10MB max)
         ]);
 
         // Stage 1: Deterministic Content Moderation Filter
