@@ -12,7 +12,6 @@ import {
   Clock,
   FileCheck,
   FileText,
-  IdCard,
   Loader2,
   Lock,
   Mail,
@@ -37,7 +36,6 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'citizen' | 'authority'>('citizen');
   const [departmentId, setDepartmentId] = useState<string>('');
-  const [employeeId, setEmployeeId] = useState<string>('');
   const [verificationDocument, setVerificationDocument] = useState<File | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
 
@@ -48,7 +46,6 @@ export default function RegisterPage() {
     email: string;
     city: string;
     departmentName: string;
-    employeeId: string;
     fileName: string;
   } | null>(null);
 
@@ -101,11 +98,6 @@ export default function RegisterPage() {
           setIsLoading(false);
           return;
         }
-        if (!employeeId.trim()) {
-          toast.error('Please enter your Employee or Badge ID.');
-          setIsLoading(false);
-          return;
-        }
         if (!verificationDocument) {
           toast.error('Please upload your official identity or verification document.');
           setIsLoading(false);
@@ -113,7 +105,6 @@ export default function RegisterPage() {
         }
         formData.append('city', city.trim());
         formData.append('department_id', departmentId);
-        formData.append('employee_id', employeeId.trim());
         formData.append('verification_document', verificationDocument);
       } else {
         if (city.trim()) {
@@ -130,7 +121,6 @@ export default function RegisterPage() {
           email: email.trim(),
           city: city.trim(),
           departmentName: selectedDept?.department_name || 'Municipal Department',
-          employeeId: employeeId.trim(),
           fileName: verificationDocument?.name || 'Uploaded Document',
         });
         setIsPendingReview(true);
@@ -190,12 +180,6 @@ export default function RegisterPage() {
             <div className="flex justify-between items-center py-1 border-b border-border/60">
               <span className="text-muted-foreground font-medium">Department</span>
               <span className="font-semibold text-primary">{submittedStaffData.departmentName}</span>
-            </div>
-            <div className="flex justify-between items-center py-1 border-b border-border/60">
-              <span className="text-muted-foreground font-medium">Employee / Badge ID</span>
-              <span className="font-mono font-bold text-foreground bg-background px-2 py-0.5 rounded border border-border">
-                {submittedStaffData.employeeId}
-              </span>
             </div>
             <div className="flex justify-between items-center py-1">
               <span className="text-muted-foreground font-medium">ID Document</span>
@@ -389,23 +373,6 @@ export default function RegisterPage() {
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-foreground mb-1">
-                  Employee / Badge ID *
-                </label>
-                <div className="relative">
-                  <IdCard className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    placeholder="e.g. EMP-ROADS-1042"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary/40 focus:border-primary text-foreground outline-none"
-                  />
                 </div>
               </div>
 

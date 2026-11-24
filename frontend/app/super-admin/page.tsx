@@ -38,7 +38,6 @@ export default function SuperAdminPage() {
   const [activeDocument, setActiveDocument] = useState<{
     staffId: number;
     staffName: string;
-    employeeId: string;
     city: string;
     departmentName: string;
     url: string;
@@ -90,7 +89,6 @@ export default function SuperAdminPage() {
       setActiveDocument({
         staffId: staff.id,
         staffName: staff.name,
-        employeeId: staff.employee_id || 'N/A',
         city: staff.city || 'Karachi (Default)',
         departmentName: staff.department?.department_name || 'Municipal Department',
         url,
@@ -212,7 +210,6 @@ export default function SuperAdminPage() {
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applicant Name</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">City Jurisdiction</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Department</th>
-                  <th className="px-5 py-3 font-semibold uppercase tracking-wider">Employee / Badge ID</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Applied Date</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider">Verification Proof</th>
                   <th className="px-5 py-3 font-semibold uppercase tracking-wider text-right">Review Actions</th>
@@ -234,11 +231,6 @@ export default function SuperAdminPage() {
                     <td className="px-5 py-3.5 whitespace-nowrap">
                       <span className="font-medium text-primary">
                         {staff.department?.department_name || 'Unassigned'}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 whitespace-nowrap">
-                      <span className="font-mono font-bold bg-muted px-2 py-0.5 rounded border border-border text-foreground">
-                        {staff.employee_id || 'N/A'}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-muted-foreground whitespace-nowrap">
@@ -307,7 +299,7 @@ export default function SuperAdminPage() {
                   Verification Document: {activeDocument.staffName}
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
-                  Badge ID: <span className="font-mono font-semibold">{activeDocument.employeeId}</span> &bull; {activeDocument.departmentName} &bull; <span className="font-semibold text-primary">{activeDocument.city}</span>
+                  {activeDocument.departmentName} &bull; <span className="font-semibold text-primary">{activeDocument.city}</span>
                 </p>
               </div>
 

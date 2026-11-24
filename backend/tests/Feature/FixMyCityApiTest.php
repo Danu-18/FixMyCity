@@ -141,7 +141,6 @@ class FixMyCityApiTest extends TestCase
             'city' => 'Karachi',
             'role' => 'authority',
             'department_id' => $department->id,
-            'employee_id' => 'EMP-ROADS-999',
             'verification_document' => $file,
         ]);
 
@@ -155,7 +154,6 @@ class FixMyCityApiTest extends TestCase
         $this->assertNotNull($user);
         $this->assertEquals('pending', $user->status);
         $this->assertEquals('Karachi', $user->city);
-        $this->assertEquals('EMP-ROADS-999', $user->employee_id);
         $this->assertNotNull($user->verification_document_path);
 
         Storage::disk('local')->assertExists($user->verification_document_path);
@@ -182,7 +180,6 @@ class FixMyCityApiTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'authority',
             'status' => 'pending',
-            'employee_id' => 'EMP-TEST-001',
         ]);
 
         // Attempt login while pending
@@ -227,7 +224,6 @@ class FixMyCityApiTest extends TestCase
             'role' => 'authority',
             'status' => 'pending',
             'department_id' => $department->id,
-            'employee_id' => 'EMP-HLTH-777',
             'verification_document_path' => $filePath,
         ]);
 
@@ -248,7 +244,6 @@ class FixMyCityApiTest extends TestCase
         $pendingResp->assertStatus(200);
         $pendingResp->assertJsonFragment([
             'email' => 'kamran.malik@fixmycity.org',
-            'employee_id' => 'EMP-HLTH-777',
             'status' => 'pending',
         ]);
 
@@ -291,7 +286,6 @@ class FixMyCityApiTest extends TestCase
             'password' => Hash::make('password123'),
             'role' => 'authority',
             'status' => 'pending',
-            'employee_id' => 'EMP-REJ-001',
         ]);
 
         // Super Admin logs in

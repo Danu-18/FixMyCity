@@ -77,7 +77,6 @@ export async function apiRegister(
         phone?: string;
         role?: string;
         department_id?: number | null;
-        employee_id?: string;
       }
 ): Promise<{ message?: string; token?: string | null; user: User }> {
   return apiFetch('/auth/register', {

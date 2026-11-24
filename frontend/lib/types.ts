@@ -11,7 +11,6 @@ export interface User {
   phone?: string | null;
   department_id?: number | null;
   department?: Department | null;
-  employee_id?: string | null;
   verification_document_path?: string | null;
   approved_by?: number | null;
   approved_at?: string | null;

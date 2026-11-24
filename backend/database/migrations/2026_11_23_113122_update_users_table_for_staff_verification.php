@@ -15,11 +15,8 @@ return new class extends Migration
             if (!Schema::hasColumn('users', 'status')) {
                 $table->string('status')->default('active')->after('role');
             }
-            if (!Schema::hasColumn('users', 'employee_id')) {
-                $table->string('employee_id')->nullable()->after('department_id');
-            }
             if (!Schema::hasColumn('users', 'verification_document_path')) {
-                $table->string('verification_document_path')->nullable()->after('employee_id');
+                $table->string('verification_document_path')->nullable()->after('department_id');
             }
             if (!Schema::hasColumn('users', 'approved_by')) {
                 $table->foreignId('approved_by')->nullable()->after('verification_document_path')->constrained('users')->nullOnDelete();
@@ -41,7 +38,6 @@ return new class extends Migration
             }
             $columnsToDrop = array_filter([
                 'status',
-                'employee_id',
                 'verification_document_path',
                 'approved_by',
                 'approved_at',

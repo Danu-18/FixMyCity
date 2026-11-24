@@ -28,7 +28,6 @@ class User extends Authenticatable
         'city',
         'status',
         'department_id',
-        'employee_id',
         'verification_document_path',
         'approved_by',
         'approved_at',

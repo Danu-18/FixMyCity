@@ -26,7 +26,6 @@ class AuthController extends Controller
 
         if ($role === 'authority') {
             $rules['department_id'] = 'required|exists:departments,id';
-            $rules['employee_id'] = 'required|string|max:100';
             $rules['city'] = 'required|string|max:100';
             $rules['verification_document'] = 'required|file|mimes:pdf,jpg,jpeg,png|max:5120';
         }
@@ -45,7 +44,6 @@ class AuthController extends Controller
                 'role' => 'authority',
                 'status' => 'pending', // Forced pending; Super Admin approval required
                 'department_id' => $validated['department_id'],
-                'employee_id' => $validated['employee_id'],
                 'verification_document_path' => $path,
             ]);
 

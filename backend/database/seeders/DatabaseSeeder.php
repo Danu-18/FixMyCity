@@ -270,7 +270,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
-            'employee_id' => 'EMP-ROADS-101',
             'phone' => '+92 321 9876543',
         ]);
 
@@ -282,7 +281,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'department_id' => $deptMap['Water & Sanitation']->id,
-            'employee_id' => 'EMP-WATER-202',
             'phone' => '+92 333 4567890',
         ]);
 
@@ -294,7 +292,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'department_id' => $deptMap['Electricity & Power Utilities']->id,
-            'employee_id' => 'EMP-POWER-303',
             'phone' => '+92 312 3456789',
         ]);
 
@@ -306,7 +303,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'department_id' => $deptMap['Municipal Waste Management']->id,
-            'employee_id' => 'EMP-WASTE-404',
             'phone' => '+92 345 6789012',
         ]);
 
@@ -318,7 +314,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Karachi',
             'department_id' => $deptMap['Public Safety & Security']->id,
-            'employee_id' => 'EMP-SAFETY-505',
             'phone' => '+92 301 2345678',
         ]);
 
@@ -331,7 +326,6 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
             'city' => 'Lahore',
             'department_id' => $deptMap['Infrastructure & Road Maintenance']->id,
-            'employee_id' => 'EMP-ROADS-LHR-101',
             'phone' => '+92 321 1122334',
         ]);
 
