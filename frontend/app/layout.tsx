@@ -5,8 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ToastProvider } from "@/components/ToastProvider";
 import { AuthProvider } from "@/context/AuthContext";
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import { PublicShell } from "@/components/PublicShell";
 
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -43,11 +42,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ToastProvider />
           <AuthProvider>
-            <Suspense fallback={<header className="h-14 w-full border-b bg-background/90" />}>
-              <Navbar />
-            </Suspense>
-            <main className="flex-1 flex flex-col">{children}</main>
-            <Footer />
+            <PublicShell>{children}</PublicShell>
           </AuthProvider>
         </ThemeProvider>
       </body>

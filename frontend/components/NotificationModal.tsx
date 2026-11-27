@@ -67,12 +67,27 @@ export function NotificationModal({ isOpen, onClose }: NotificationModalProps) {
     }
     onClose();
 
-    if (notif.complaint_id) {
-      router.push(`/complaints/${notif.complaint_id}`);
-    } else if (user?.role === 'super_admin' || user?.role === 'authority') {
-      router.push('/dashboard');
+    if (user?.role === 'super_admin') {
+      const isStaffNotif =
+        notif.type?.toLowerCase().includes('staff') ||
+        notif.title?.toLowerCase().includes('staff') ||
+        notif.message?.toLowerCase().includes('staff') ||
+        notif.message?.toLowerCase().includes('registration') ||
+        notif.title?.toLowerCase().includes('registration');
+
+      if (isStaffNotif) {
+        router.push('/super-admin/staff');
+      } else {
+        router.push('/super-admin/moderation');
+      }
+    } else if (user?.role === 'authority') {
+      router.push('/authority/queue');
     } else {
-      router.push('/track');
+      if (notif.complaint_id) {
+        router.push(`/complaints/${notif.complaint_id}`);
+      } else {
+        router.push('/track');
+      }
     }
   };
 

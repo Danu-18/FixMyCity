@@ -90,7 +90,7 @@ export function Footer() {
         <div className="flex gap-6">
           <Link href="/explore" className="hover:text-primary transition-colors">Heatmap</Link>
           <Link href="/track" className="hover:text-primary transition-colors">Track Issue</Link>
-          <Link href="/dashboard" className="hover:text-primary transition-colors">Officer Portal</Link>
+          <Link href="/authority" className="hover:text-primary transition-colors">Officer Portal</Link>
         </div>
       </div>
     </footer>

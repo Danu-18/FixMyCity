@@ -8,7 +8,16 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Normalizes complaint image URLs ensuring correct port, protocol, and storage routing.
  */
-export function getComplaintImageUrl(url?: string | null): string | null {
+export function getComplaintImageUrl(
+  urlOrComplaint?: string | null | { image_url?: string | null; image_path?: string | null }
+): string | null {
+  if (!urlOrComplaint) return null;
+
+  const url =
+    typeof urlOrComplaint === 'string'
+      ? urlOrComplaint
+      : urlOrComplaint.image_url || urlOrComplaint.image_path;
+
   if (!url) return null;
 
   const storageBase = process.env.NEXT_PUBLIC_STORAGE_URL || 'http://localhost:8000/storage';

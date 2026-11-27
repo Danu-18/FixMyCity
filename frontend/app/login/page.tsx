@@ -69,15 +69,25 @@ export default function LoginPage() {
     return () => clearInterval(interval);
   }, [forgotCooldown]);
 
+  const redirectByRole = (userRole?: string) => {
+    if (userRole === 'super_admin') {
+      router.push('/super-admin');
+    } else if (userRole === 'authority') {
+      router.push('/authority');
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setAuthError(null);
 
     try {
-      await login(email.trim(), password);
+      const loggedInUser = await login(email.trim(), password);
       toast.success('Signed in successfully! Welcome back.');
-      router.push('/dashboard');
+      redirectByRole(loggedInUser.role);
     } catch (err: any) {
       const msg = err.message || 'Invalid email or password.';
       if (err.status === 429 || msg.toLowerCase().includes('too many') || msg.includes('429')) {
@@ -137,7 +147,7 @@ export default function LoginPage() {
       const res = await apiVerifyEmail(targetEmail, otpCode.trim());
       setSession(res.user, res.token);
       toast.success('Email verified successfully! Welcome to FixMyCity.');
-      router.push('/dashboard');
+      redirectByRole(res.user.role);
     } catch (err: any) {
       toast.error(err.message || 'Invalid or expired verification code.');
     } finally {
@@ -173,9 +183,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(demoEmail, demoPassword);
+      const loggedInUser = await login(demoEmail, demoPassword);
       toast.success(`Signed in as ${demoEmail}`);
-      router.push('/dashboard');
+      redirectByRole(loggedInUser.role);
     } catch (err: any) {
       const msg = err.message || 'Failed to sign in with demo credentials.';
       if (err.status === 429 || msg.toLowerCase().includes('too many') || msg.includes('429')) {

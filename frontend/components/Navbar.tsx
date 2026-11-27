@@ -73,13 +73,26 @@ export function Navbar() {
               <Link
                 href="/super-admin"
                 className={`relative py-1 transition-colors flex items-center gap-1.5 text-amber-700 dark:text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 font-semibold after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:bg-amber-500 after:transition-all ${
-                  pathname === '/super-admin'
+                  pathname.startsWith('/super-admin')
                     ? 'after:w-full font-bold'
                     : 'after:w-0 hover:after:w-full'
                 }`}
               >
                 <ShieldCheck className="h-4 w-4" />
                 Super Admin
+              </Link>
+            )}
+            {user?.role === 'authority' && (
+              <Link
+                href="/authority"
+                className={`relative py-1 transition-colors flex items-center gap-1.5 text-primary hover:text-primary/80 font-semibold after:absolute after:-bottom-1 after:left-0 after:h-0.5 after:bg-primary after:transition-all ${
+                  pathname.startsWith('/authority')
+                    ? 'after:w-full font-bold'
+                    : 'after:w-0 hover:after:w-full'
+                }`}
+              >
+                <Building2 className="h-4 w-4" />
+                Municipal Portal
               </Link>
             )}
             <Link
@@ -147,21 +160,29 @@ export function Navbar() {
                       </span>
                     </div>
 
-                    <Link
-                      href="/dashboard"
-                      className="flex items-center gap-2 px-4 py-2.5 text-xs text-foreground hover:bg-accent transition-colors"
-                    >
-                      <LayoutDashboard className="w-3.5 h-3.5 text-muted-foreground" />
-                      Dashboard Portal
-                    </Link>
-
-                    {user.role === 'super_admin' && (
+                    {user.role === 'super_admin' ? (
                       <Link
                         href="/super-admin"
                         className="flex items-center gap-2 px-4 py-2.5 text-xs text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 transition-colors font-medium"
                       >
                         <ShieldCheck className="w-3.5 h-3.5" />
                         Super Admin Console
+                      </Link>
+                    ) : user.role === 'authority' ? (
+                      <Link
+                        href="/authority"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-primary hover:bg-primary/10 transition-colors font-medium"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        Municipal Operations
+                      </Link>
+                    ) : (
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center gap-2 px-4 py-2.5 text-xs text-foreground hover:bg-accent transition-colors"
+                      >
+                        <LayoutDashboard className="w-3.5 h-3.5 text-muted-foreground" />
+                        Citizen Dashboard
                       </Link>
                     )}
 
@@ -248,20 +269,29 @@ export function Navbar() {
             </Link>
             {user ? (
               <div className="border-t border-border pt-3 space-y-2">
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-primary font-semibold"
-                >
-                  Dashboard ({user.name})
-                </Link>
-                {user.role === 'super_admin' && (
+                {user.role === 'super_admin' ? (
                   <Link
                     href="/super-admin"
                     onClick={() => setMobileMenuOpen(false)}
                     className="block text-amber-700 dark:text-amber-400 font-semibold text-xs"
                   >
                     🛡️ Super Admin Console
+                  </Link>
+                ) : user.role === 'authority' ? (
+                  <Link
+                    href="/authority"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-primary font-semibold text-xs"
+                  >
+                    🏛️ Municipal Operations Portal
+                  </Link>
+                ) : (
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="block text-primary font-semibold text-xs"
+                  >
+                    Citizen Dashboard ({user.name})
                   </Link>
                 )}
                 <button
