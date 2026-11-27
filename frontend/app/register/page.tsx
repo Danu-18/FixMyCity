@@ -96,6 +96,35 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!name.trim()) {
+      toast.error('Please enter your full name.');
+      return;
+    }
+    if (!email.trim()) {
+      toast.error('Please enter your email address.');
+      return;
+    }
+    if (!password || password.length < 8) {
+      toast.error('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (role === 'authority') {
+      if (!city.trim()) {
+        toast.error('Please select your assigned city jurisdiction.');
+        return;
+      }
+      if (!departmentId) {
+        toast.error('Please select your municipal department.');
+        return;
+      }
+      if (!verificationDocument) {
+        toast.error('Please upload your official identity or verification document.');
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
@@ -107,19 +136,8 @@ export default function RegisterPage() {
       if (phone.trim()) formData.append('phone', phone.trim());
 
       if (role === 'authority') {
-        if (!city.trim()) {
-          toast.error('Please select your assigned city jurisdiction.');
-          setIsLoading(false);
-          return;
-        }
-        if (!departmentId) {
-          toast.error('Please select your municipal department.');
-          setIsLoading(false);
-          return;
-        }
         if (!verificationDocument) {
           toast.error('Please upload your official identity or verification document.');
-          setIsLoading(false);
           return;
         }
         formData.append('city', city.trim());
@@ -373,7 +391,7 @@ export default function RegisterPage() {
       </div>
 
       <div className="bg-card border border-border rounded-xl p-6 sm:p-8 shadow-sm space-y-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Role Selector Tabs */}
           <div>
             <label className="block text-xs font-bold text-foreground mb-1.5">
@@ -530,12 +548,13 @@ export default function RegisterPage() {
                   Verification Document (PDF/JPG/PNG, max 5MB) *
                 </label>
                 <div className="mt-1 flex items-center gap-3">
-                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 border border-dashed border-input rounded-lg text-xs font-medium text-foreground hover:border-primary hover:bg-accent transition-colors">
+                  <label htmlFor="verification-document" className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 border border-dashed border-input rounded-lg text-xs font-medium text-foreground hover:border-primary hover:bg-accent transition-colors">
                     <UploadCloud className="w-4 h-4 text-primary" />
                     <span>{verificationDocument ? 'Change Document' : 'Upload Badge / Appointment Letter'}</span>
                     <input
+                      id="verification-document"
+                      name="verification_document"
                       type="file"
-                      required
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={handleFileChange}
                       className="hidden"
